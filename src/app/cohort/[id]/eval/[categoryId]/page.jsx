@@ -10,6 +10,7 @@ import { SCORING_METHOD } from '@/lib/schema';
 import InlineSettings from '@/components/eval/InlineSettings';
 import ScoreTable from '@/components/eval/ScoreTable';
 import SummaryTable from '@/components/eval/SummaryTable';
+import FieldManager from '@/components/eval/FieldManager';
 import SlidePanel from '@/components/layout/SlidePanel';
 import ConflictDialog from '@/components/common/ConflictDialog';
 
@@ -185,24 +186,30 @@ export default function EvalPage({ params }) {
 
       {/* Score Table */}
       {isComposite ? (
-        <SummaryTable
-          title={category.name}
-          students={compositeStudents}
-          columns={compositeColumns}
-          data={compositeData}
-          onColumnClick={handleSubCategoryClick}
-          showRank={false}
-        />
+        <>
+          <SummaryTable
+            title={category.name}
+            students={compositeStudents}
+            columns={compositeColumns}
+            data={compositeData}
+            onColumnClick={handleSubCategoryClick}
+            showRank={false}
+          />
+          <FieldManager category={category} onSave={handleSettingsSave} />
+        </>
       ) : (
-        <ScoreTable
-          category={category}
-          students={students?.students || []}
-          scores={scores}
-          calculatedResults={scores?.calculated || {}}
-          showDropout={showDropout}
-          onScoreChange={handleScoreChange}
-          onSubCategoryClick={handleSubCategoryClick}
-        />
+        <>
+          <ScoreTable
+            category={category}
+            students={students?.students || []}
+            scores={scores}
+            calculatedResults={scores?.calculated || {}}
+            showDropout={showDropout}
+            onScoreChange={handleScoreChange}
+            onSubCategoryClick={handleSubCategoryClick}
+          />
+          <FieldManager category={category} onSave={handleSettingsSave} />
+        </>
       )}
 
       {/* Conflict Dialog */}

@@ -50,7 +50,9 @@ export default function CohortLayout({ children, params }) {
       </div>
       <div className="flex flex-1 h-[calc(100vh-3.5rem-2.5rem)]">
         <div className="flex-1 overflow-y-auto">
-          {children}
+          <div className="w-[80%] mx-auto">
+            {children}
+          </div>
         </div>
         <Sidebar
           results={cohortData.results}

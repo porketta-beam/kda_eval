@@ -76,11 +76,11 @@ kda_eval/
 │   │   ├── layout.js                     # 전체 레이아웃 (Navbar + SocketProvider)
 │   │   ├── page.js                       # 기수 관리 홈 (생성, 복제, 삭제)
 │   │   ├── cohort/[id]/
-│   │   │   ├── layout.jsx                # 기수 레이아웃 (탭 + 사이드바 + CohortDataContext)
+│   │   │   ├── layout.jsx                # 기수 레이아웃 (탭 + 사이드바 + CohortDataContext, 메인 콘텐츠 w-[80%] 중앙정렬)
 │   │   │   ├── page.jsx                  # ★ 총점 대시보드 (SummaryTable + 항목 관리 Collapsible + 집계 설정)
 │   │   │   ├── students/page.jsx         # 학생 명단 관리 + 팀 관리
 │   │   │   └── eval/[categoryId]/
-│   │   │       └── page.jsx              # ★ 항목별 점수 입력 (리프: ScoreTable, 복합: SummaryTable) + 인라인 설정 + ConflictDialog
+│   │   │       └── page.jsx              # ★ 항목별 점수 입력 (리프: ScoreTable, 복합: SummaryTable) + 인라인 설정 + FieldManager + ConflictDialog
 │   │   └── api/
 │   │       └── cohorts/
 │   │           ├── route.js              # GET/POST (목록, 생성 — UUID 자동, 이름 중복 체크)
@@ -104,12 +104,13 @@ kda_eval/
 │   ├── components/
 │   │   ├── layout/
 │   │   │   ├── Navbar.jsx                # 상단 네비게이션 (기수 선택 + CSV 내보내기 드롭다운)
-│   │   │   ├── Sidebar.jsx               # 우측 접이식 총점 사이드바 (누적/예상 모드)
+│   │   │   ├── Sidebar.jsx               # 우측 총점 사이드바 (접기/드래그 리사이즈 180~500px, 누적/예상 모드)
 │   │   │   └── SlidePanel.jsx            # ★ 하위 항목 슬라이드 오버 패널
 │   │   ├── eval/
-│   │   │   ├── ScoreTable.jsx            # 점수 입력 테이블 (리프 항목 전용)
-│   │   │   ├── SummaryTable.jsx          # ★ 읽기 전용 총점/복합 테이블 (대시보드 + 복합 카테고리 공용)
+│   │   │   ├── ScoreTable.jsx            # 점수 입력 테이블 (리프 항목 전용, min-w-[60%] w-fit)
+│   │   │   ├── SummaryTable.jsx          # ★ 읽기 전용 총점/복합 테이블 (대시보드 + 복합 카테고리 공용, min-w-[60%] w-fit)
 │   │   │   ├── InlineSettings.jsx        # ★ 인라인 설정 패널 (방식별 동적 폼)
+│   │   │   ├── FieldManager.jsx          # ★ 항목 관리 Collapsible (leaf: input_fields, composite: sub_categories)
 │   │   │   └── CategoryCard.jsx          # 카테고리 카드 (목록용, 삭제/순서 변경 버튼 포함)
 │   │   ├── common/
 │   │   │   └── ConflictDialog.jsx        # 낙관적 잠금 충돌 다이얼로그
@@ -604,6 +605,9 @@ scoringEngine.calculate(category, rawScores, students)
 ```
 - 복합 항목은 ScoreTable 대신 **SummaryTable** 렌더링 (읽기 전용, 순위 미표시)
 - 대시보드의 SummaryTable과 동일 컴포넌트 재사용
+- 테이블 아래 **FieldManager** Collapsible: leaf → input_fields 추가/삭제/순서변경, composite → sub_categories 추가/삭제/순서변경
+- 테이블 너비: `min-w-[60%] w-fit` — 최소 60%, 내용에 따라 확장, 100% 초과 시 횡스크롤
+- 메인 콘텐츠 영역: `w-[80%] mx-auto` 중앙정렬
 
 ### 5-4. 슬라이드 패널 (하위 항목 드릴다운)
 
@@ -654,6 +658,8 @@ scoringEngine.calculate(category, rawScores, students)
 ```
 
 ### 5-5. 우측 사이드바
+
+**드래그 리사이즈**: 좌측 경계를 드래그하여 너비 조절 (180px ~ 500px, 기본 224px). `shrink-0`으로 메인 콘텐츠와 독립적인 크기 유지.
 
 **누적 모드 (기본)**:
 - 현재까지 입력된 항목만 합산
@@ -955,6 +961,12 @@ npm run test:scoring
 - [x] E2E 워크플로우 테스트 (10개 — `tests/e2e/kda-workflow.spec.js`)
   - 기수 생성/중복 체크, 학생 추가, 카테고리 추가/삭제/순서 변경
   - 점수 입력, 사이드바 총점/순위 확인, CSV 내보내기, 데이터 영속성
+
+### Phase 7: UI 개선 ✅
+- [x] 테이블 너비 조정 — `w-full` 제거, `min-w-[60%] w-fit`으로 내용 기반 너비
+- [x] 사이드바 드래그 리사이즈 (180~500px, `shrink-0` 독립 크기)
+- [x] 메인 콘텐츠 영역 80% 너비 + 중앙정렬 (`w-[80%] mx-auto`)
+- [x] FieldManager 컴포넌트 — eval 페이지에서 input_fields/sub_categories 관리 UI
 
 ---
 

@@ -71,7 +71,7 @@ export default function SummaryTable({
   return (
     <div className="mb-4">
       {title && <h3 className="text-sm font-semibold mb-2">{title}</h3>}
-      <Table>
+      <Table className="min-w-[60%] w-fit">
         <TableHeader>
           <TableRow>
             <SortHeader sortId="name">이름</SortHeader>

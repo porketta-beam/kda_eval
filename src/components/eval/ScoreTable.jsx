@@ -79,7 +79,7 @@ export default function ScoreTable({
   if (isComposite) {
     // Composite table: shows sub-category calculated values
     return (
-      <Table>
+      <Table className="min-w-[60%] w-fit">
         <TableHeader>
           <TableRow>
             <SortHeader sortId="name">이름</SortHeader>
@@ -128,7 +128,7 @@ export default function ScoreTable({
   const showRank = category.scoring_method === SCORING_METHOD.RANK_DIFFERENTIAL;
 
   return (
-    <Table>
+    <Table className="min-w-[60%] w-fit">
       <TableHeader>
         <TableRow>
           <SortHeader sortId="name">이름</SortHeader>
