@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import {
   Table,
   TableBody,
@@ -72,9 +72,66 @@ export default function ScoreTable({
     </TableHead>
   );
 
+  const tableRef = useRef(null);
+
   const handleCellChange = useCallback((studentId, fieldId, value) => {
     onScoreChange?.(studentId, fieldId, value);
   }, [onScoreChange]);
+
+  // Enter 키로 다음 행 같은 칼럼으로 포커스 이동
+  const focusNextRow = useCallback((currentRow, currentCol) => {
+    if (!tableRef.current) return;
+    const nextRow = currentRow + 1;
+    const selector = `[data-row="${nextRow}"][data-col="${currentCol}"]`;
+    const nextInput = tableRef.current.querySelector(selector);
+    if (nextInput) {
+      nextInput.focus();
+      nextInput.select();
+    }
+  }, []);
+
+  // 엑셀 칼럼 붙여넣기 처리
+  const handlePaste = useCallback((e, startRow, startCol) => {
+    const pasteData = e.clipboardData?.getData('text');
+    if (!pasteData) return;
+
+    // 탭+줄바꿈으로 분리 (엑셀 복사 형식)
+    const rows = pasteData.split(/\r?\n/).filter(r => r.length > 0);
+    // 단일 값이면 기본 동작 사용
+    if (rows.length <= 1 && !rows[0]?.includes('\t')) return;
+
+    e.preventDefault();
+
+    const parsed = rows.map(row => row.split('\t'));
+
+    for (let r = 0; r < parsed.length; r++) {
+      const studentIdx = startRow + r;
+      if (studentIdx >= sortedStudents.length) break;
+      const student = sortedStudents[studentIdx];
+
+      for (let c = 0; c < parsed[r].length; c++) {
+        const fieldIdx = startCol + c;
+        if (fieldIdx >= inputFields.length) break;
+        const field = inputFields[fieldIdx];
+        const raw = parsed[r][c].trim();
+
+        let value;
+        if (field.type === 'number') {
+          value = raw === '' ? null : Number(raw);
+          if (value !== null && isNaN(value)) continue;
+        } else if (field.type === 'boolean') {
+          value = (raw === '1' || raw.toLowerCase() === 'true') ? 1 : 0;
+        } else {
+          value = raw;
+        }
+
+        onScoreChange?.(student.id, field.id, value);
+      }
+    }
+
+    // 붙여넣기 후 셀의 로컬 값도 업데이트하기 위해 blur
+    if (document.activeElement) document.activeElement.blur();
+  }, [sortedStudents, inputFields, onScoreChange]);
 
   if (isComposite) {
     // Composite table: shows sub-category calculated values
@@ -128,54 +185,59 @@ export default function ScoreTable({
   const showRank = category.scoring_method === SCORING_METHOD.RANK_DIFFERENTIAL;
 
   return (
-    <Table className="min-w-[60%] w-fit">
-      <TableHeader>
-        <TableRow>
-          <SortHeader sortId="name">이름</SortHeader>
-          {inputFields.map(field => (
-            <SortHeader key={field.id} sortId={field.id} className="text-center">
-              {field.name}
-            </SortHeader>
-          ))}
-          {showRank && <SortHeader sortId="rank" className="text-center">순위</SortHeader>}
-          <SortHeader sortId="calculated" className="text-right">점수</SortHeader>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {sortedStudents.map(student => {
-          const studentScores = categoryScores[student.id] || {};
-          const result = calcResults[student.id];
-          return (
-            <TableRow
-              key={student.id}
-              className={student.is_dropout ? 'bg-[var(--color-dropout-row)] text-[var(--color-dropout-text)]' : ''}
-            >
-              <TableCell>{student.name}</TableCell>
-              {inputFields.map(field => (
-                <TableCell key={field.id} className="text-center p-1">
-                  <ScoreInput
-                    field={field}
-                    value={studentScores[field.id]}
-                    onChange={v => handleCellChange(student.id, field.id, v)}
-                    disabled={student.is_dropout}
-                  />
+    <div ref={tableRef}>
+      <Table className="min-w-[60%] w-fit">
+        <TableHeader>
+          <TableRow>
+            <SortHeader sortId="name">이름</SortHeader>
+            {inputFields.map(field => (
+              <SortHeader key={field.id} sortId={field.id} className="text-center">
+                {field.name}
+              </SortHeader>
+            ))}
+            {showRank && <SortHeader sortId="rank" className="text-center">순위</SortHeader>}
+            <SortHeader sortId="calculated" className="text-right">점수</SortHeader>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {sortedStudents.map((student, rowIdx) => {
+            const studentScores = categoryScores[student.id] || {};
+            const result = calcResults[student.id];
+            return (
+              <TableRow
+                key={student.id}
+                className={student.is_dropout ? 'bg-[var(--color-dropout-row)] text-[var(--color-dropout-text)]' : ''}
+              >
+                <TableCell>{student.name}</TableCell>
+                {inputFields.map((field, colIdx) => (
+                  <TableCell key={field.id} className="text-center p-1">
+                    <ScoreInput
+                      field={field}
+                      value={studentScores[field.id]}
+                      onChange={v => handleCellChange(student.id, field.id, v)}
+                      row={rowIdx}
+                      col={colIdx}
+                      onEnter={focusNextRow}
+                      onPaste={handlePaste}
+                    />
+                  </TableCell>
+                ))}
+                {showRank && (
+                  <TableCell className="text-center">{result?.rank ?? '-'}</TableCell>
+                )}
+                <TableCell className="text-right font-medium">
+                  {result?.calculated != null ? (typeof result.calculated === 'number' ? result.calculated.toFixed(1) : result.calculated) : '-'}
                 </TableCell>
-              ))}
-              {showRank && (
-                <TableCell className="text-center">{result?.rank ?? '-'}</TableCell>
-              )}
-              <TableCell className="text-right font-medium">
-                {result?.calculated != null ? (typeof result.calculated === 'number' ? result.calculated.toFixed(1) : result.calculated) : '-'}
-              </TableCell>
-            </TableRow>
-          );
-        })}
-      </TableBody>
-    </Table>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </div>
   );
 }
 
-function ScoreInput({ field, value, onChange, disabled }) {
+function ScoreInput({ field, value, onChange, row, col, onEnter, onPaste }) {
   const [localValue, setLocalValue] = useState(value ?? '');
 
   const handleBlur = () => {
@@ -187,12 +249,19 @@ function ScoreInput({ field, value, onChange, disabled }) {
     }
   };
 
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      e.target.blur();
+      onEnter?.(row, col);
+    }
+  };
+
   if (field.type === 'boolean') {
     return (
       <Checkbox
         checked={!!value}
         onCheckedChange={v => onChange(v ? 1 : 0)}
-        disabled={disabled}
       />
     );
   }
@@ -203,9 +272,11 @@ function ScoreInput({ field, value, onChange, disabled }) {
       value={localValue}
       onChange={e => setLocalValue(e.target.value)}
       onBlur={handleBlur}
-      onKeyDown={e => e.key === 'Enter' && e.target.blur()}
+      onKeyDown={handleKeyDown}
+      onPaste={e => onPaste?.(e, row, col)}
       className="h-7 w-20 text-center text-sm"
-      disabled={disabled}
+      data-row={row}
+      data-col={col}
       min={field.min}
       max={field.max}
       step="any"

@@ -608,6 +608,7 @@ scoringEngine.calculate(category, rawScores, students)
 - 테이블 아래 **FieldManager** Collapsible: leaf → input_fields 추가/삭제/순서변경, composite → sub_categories 추가/삭제/순서변경
 - 테이블 너비: `min-w-[60%] w-fit` — 최소 60%, 내용에 따라 확장, 100% 초과 시 횡스크롤
 - 메인 콘텐츠 영역: `w-[80%] mx-auto` 중앙정렬
+- **데이터 입력 기능**: 중도퇴소자도 입력 가능, Enter로 다음 행 이동, 엑셀 칼럼 붙여넣기 지원, number input 스피너 숨김
 
 ### 5-4. 슬라이드 패널 (하위 항목 드릴다운)
 
@@ -868,11 +869,47 @@ pm2 start npm --name "kda-eval" -- start -- -p 80
 ### 8-5. 중도퇴소 처리 (요구사항 9)
 
 - 학생 명단 화면에서 체크박스로 중도퇴소 표시
+- 중도퇴소 인원도 **점수 입력 가능** (disabled 제거, 행 스타일만 구분)
 - 모든 점수 입력/조회 화면:
   - 기본: 중도퇴소 인원 **숨김**
   - `☐ 중도퇴소 인원 표시` 체크 시 표시 (토큰: `--color-dropout-row`)
 - 총점 계산/순위에서 중도퇴소 인원 **제외**
 - 사이드바, 슬라이드 패널에서도 동일 토글 적용
+
+### 8-6. 데이터 입력 UX
+
+#### 엑셀 붙여넣기 (ScoreTable)
+
+엑셀에서 칼럼(또는 범위)을 복사한 뒤 ScoreTable의 셀에 붙여넣으면, 해당 셀부터 아래/오른쪽 방향으로 데이터가 자동 입력된다.
+
+**구현 상세:**
+
+1. **이벤트 가로채기**: 각 `<input>`에 `onPaste` 핸들러 등록. 이벤트 발생 시 `e.clipboardData.getData('text')`로 클립보드 텍스트를 읽음
+2. **엑셀 형식 파싱**: 엑셀은 복사 시 셀을 **탭(`\t`)으로 칼럼 구분**, **줄바꿈(`\r\n` 또는 `\n`)으로 행 구분**하여 클립보드에 저장. 이를 `split(/\r?\n/)` → `split('\t')`로 2차원 배열로 변환
+3. **단일 값 판별**: 행이 1개이고 탭이 없으면 일반 붙여넣기(기본 동작)로 처리하여 사용자 경험 보존
+4. **다중 셀 입력**: `e.preventDefault()`로 기본 동작 차단 후, 파싱된 2차원 데이터를 현재 셀 위치(`startRow`, `startCol`)부터 순회하며 `onScoreChange(studentId, fieldId, value)` 호출
+5. **타입 변환**: number 필드는 `Number()` 변환 (NaN이면 건너뜀), boolean 필드는 `'1'`/`'true'` → 1, 그 외 → 0, text 필드는 그대로 사용
+6. **범위 제한**: 학생 수 또는 필드 수를 넘는 데이터는 무시 (배열 경계 체크)
+7. **셀 위치 식별**: 각 input에 `data-row`, `data-col` 속성 부여. 테이블을 감싸는 `ref`의 `querySelector`로 특정 위치의 input을 찾음
+
+**사용 예시:**
+```
+엑셀에서 A1:A5 (5명의 점수 칼럼) 복사
+→ ScoreTable 첫 번째 학생의 해당 필드 셀 클릭
+→ Ctrl+V
+→ 5명의 점수가 순서대로 자동 입력
+```
+
+#### Enter 키 네비게이션
+
+셀에서 Enter 입력 시:
+1. 현재 셀의 값을 저장 (blur 트리거 → `onScoreChange` 호출)
+2. 같은 칼럼의 다음 행 셀로 포커스 이동 (`data-row`/`data-col` 기반 querySelector)
+3. 이동한 셀의 텍스트 자동 선택 (select)
+
+#### Number Input 스피너 숨김
+
+`globals.css`에서 `input[type="number"]`의 WebKit/Firefox 스피너를 전역으로 숨김 처리하여, 호버/포커스 시 화살표가 나타나지 않음.
 
 ---
 
@@ -967,6 +1004,10 @@ npm run test:scoring
 - [x] 사이드바 드래그 리사이즈 (180~500px, `shrink-0` 독립 크기)
 - [x] 메인 콘텐츠 영역 80% 너비 + 중앙정렬 (`w-[80%] mx-auto`)
 - [x] FieldManager 컴포넌트 — eval 페이지에서 input_fields/sub_categories 관리 UI
+- [x] 중도퇴소자 점수 입력 가능 (disabled 제거)
+- [x] 엑셀 칼럼 붙여넣기 지원 (탭/줄바꿈 파싱, 다중 셀 일괄 입력)
+- [x] Enter 키로 다음 행 같은 칼럼 포커스 이동
+- [x] number input 스피너(화살표) 전역 숨김
 
 ---
 
