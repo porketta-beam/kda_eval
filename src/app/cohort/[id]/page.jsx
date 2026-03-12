@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useState } from 'react';
+import { use, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCohortDataContext } from '@/hooks/CohortDataContext';
 import { Button } from '@/components/ui/button';
@@ -28,13 +28,15 @@ import {
 } from '@/components/ui/select';
 import { SCORING_METHOD } from '@/lib/schema';
 import CategoryCard from '@/components/eval/CategoryCard';
+import SummaryTable from '@/components/eval/SummaryTable';
 
 export default function CohortDashboard({ params }) {
   const { id: cohortId } = use(params);
-  const { config, students, scores, loading, fetchConfig, fetchScores, fetchResults } = useCohortDataContext();
+  const { config, students, scores, results, loading, fetchConfig, fetchScores, fetchResults } = useCohortDataContext();
   const router = useRouter();
 
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
   const [showDropout, setShowDropout] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [newCatName, setNewCatName] = useState('');
@@ -48,13 +50,61 @@ export default function CohortDashboard({ params }) {
   const [aggMaxScore, setAggMaxScore] = useState(String(aggSettings.max_score ?? 100));
   const [aggBonusLimit, setAggBonusLimit] = useState(String(aggSettings.bonus_limit ?? 3));
 
+  const categories = useMemo(() =>
+    (config?.evaluation_categories || []).sort((a, b) => a.order - b.order),
+    [config]
+  );
+
+  const activeStudents = useMemo(() =>
+    students?.students?.filter(s => !s.is_dropout) || [],
+    [students]
+  );
+
+  const dropoutCount = useMemo(() =>
+    students?.students?.filter(s => s.is_dropout).length || 0,
+    [students]
+  );
+
+  const summaryColumns = useMemo(() =>
+    categories.map(cat => ({
+      id: cat.id,
+      name: cat.name,
+      maxScore: cat.max_score,
+      isBonus: cat.is_bonus,
+      isClickable: true,
+    })),
+    [categories]
+  );
+
+  const summaryData = useMemo(() => {
+    const totals = results?.results?.totals;
+    if (!totals) return {};
+    const allStudents = students?.students || [];
+    const d = {};
+    for (const student of allStudents) {
+      const t = totals[student.id];
+      const scores = {};
+      if (t?.breakdown) {
+        for (const catId of Object.keys(t.breakdown)) {
+          scores[catId] = t.breakdown[catId]?.score ?? null;
+        }
+      }
+      d[student.id] = {
+        scores,
+        total: t?.total ?? 0,
+        rank: t?.rank ?? null,
+      };
+    }
+    return d;
+  }, [results, students]);
+
+  const summaryStudents = showDropout
+    ? (students?.students || [])
+    : activeStudents;
+
   if (loading || !config) {
     return <div className="p-6 text-muted-foreground">로딩 중...</div>;
   }
-
-  const categories = (config.evaluation_categories || []).sort((a, b) => a.order - b.order);
-  const activeStudents = students?.students?.filter(s => !s.is_dropout) || [];
-  const dropoutCount = students?.students?.filter(s => s.is_dropout).length || 0;
 
   const handleAddCategory = async () => {
     if (!newCatName) return;
@@ -196,32 +246,53 @@ export default function CohortDashboard({ params }) {
         </div>
       </div>
 
-      <div className="space-y-1 mb-4">
-        <div className="flex items-center gap-3 px-3 py-1.5 text-xs text-muted-foreground font-medium">
-          <span className="w-4" />
-          <span className="flex-1">평가 항목</span>
-          <span className="w-12 text-right">만점</span>
-          <span className="w-16 text-center">방식</span>
-          <span className="w-20 text-center">진행률</span>
-          <span className="w-[5.5rem]" />
-        </div>
-        {categories.map((cat, idx) => (
-          <CategoryCard
-            key={cat.id}
-            category={cat}
-            scores={scores}
-            students={students?.students}
-            onClick={() => handleCategoryClick(cat)}
-            onDelete={() => handleDeleteCategory(cat.id)}
-            onMoveUp={idx > 0 ? () => handleReorder(idx, -1) : null}
-            onMoveDown={idx < categories.length - 1 ? () => handleReorder(idx, 1) : null}
-          />
-        ))}
-      </div>
+      {results?.results?.totals && (
+        <SummaryTable
+          title="총점"
+          students={summaryStudents}
+          columns={summaryColumns}
+          data={summaryData}
+          onColumnClick={(column) => router.push(`/cohort/${encodeURIComponent(cohortId)}/eval/${column.id}`)}
+        />
+      )}
 
-      <Button variant="outline" onClick={() => setAddDialogOpen(true)}>
-        + 평가항목 추가
-      </Button>
+      <Collapsible open={categoriesOpen} onOpenChange={setCategoriesOpen}>
+        <div className="flex items-center gap-2 mb-2">
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" size="sm">
+              {categoriesOpen ? '▼' : '▶'} 항목 관리
+            </Button>
+          </CollapsibleTrigger>
+        </div>
+        <CollapsibleContent>
+          <div className="space-y-1 mb-4">
+            <div className="flex items-center gap-3 px-3 py-1.5 text-xs text-muted-foreground font-medium">
+              <span className="w-4" />
+              <span className="flex-1">평가 항목</span>
+              <span className="w-12 text-right">만점</span>
+              <span className="w-16 text-center">방식</span>
+              <span className="w-20 text-center">진행률</span>
+              <span className="w-[5.5rem]" />
+            </div>
+            {categories.map((cat, idx) => (
+              <CategoryCard
+                key={cat.id}
+                category={cat}
+                scores={scores}
+                students={students?.students}
+                onClick={() => handleCategoryClick(cat)}
+                onDelete={() => handleDeleteCategory(cat.id)}
+                onMoveUp={idx > 0 ? () => handleReorder(idx, -1) : null}
+                onMoveDown={idx < categories.length - 1 ? () => handleReorder(idx, 1) : null}
+              />
+            ))}
+          </div>
+
+          <Button variant="outline" onClick={() => setAddDialogOpen(true)}>
+            + 평가항목 추가
+          </Button>
+        </CollapsibleContent>
+      </Collapsible>
 
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
         <DialogContent>

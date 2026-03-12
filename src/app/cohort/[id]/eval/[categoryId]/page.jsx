@@ -6,8 +6,10 @@ import { useCohortDataContext } from '@/hooks/CohortDataContext';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { SCORING_METHOD } from '@/lib/schema';
 import InlineSettings from '@/components/eval/InlineSettings';
 import ScoreTable from '@/components/eval/ScoreTable';
+import SummaryTable from '@/components/eval/SummaryTable';
 import SlidePanel from '@/components/layout/SlidePanel';
 import ConflictDialog from '@/components/common/ConflictDialog';
 
@@ -115,6 +117,45 @@ export default function EvalPage({ params }) {
     router.push(`/cohort/${encodeURIComponent(cohortId)}/eval/${sub.id}`);
   }, [cohortId, router]);
 
+  const isComposite = category?.scoring_method === SCORING_METHOD.COMPOSITE;
+  const subCategories = category?.sub_categories || [];
+
+  const compositeColumns = useMemo(() => {
+    if (!isComposite) return [];
+    return subCategories.map(sub => ({
+      id: sub.id,
+      name: sub.name,
+      maxScore: sub.max_score,
+      isBonus: sub.is_bonus,
+      isClickable: !!(sub.sub_categories?.length),
+    }));
+  }, [isComposite, subCategories]);
+
+  const compositeData = useMemo(() => {
+    if (!isComposite) return {};
+    const calcResults = scores?.calculated?.[categoryId] || {};
+    const allStudents = students?.students || [];
+    const d = {};
+    for (const student of allStudents) {
+      const result = calcResults[student.id];
+      const sScores = {};
+      for (const sub of subCategories) {
+        sScores[sub.id] = result?.sub_scores?.[sub.id]?.calculated ?? null;
+      }
+      d[student.id] = {
+        scores: sScores,
+        total: result?.calculated ?? 0,
+        rank: null,
+      };
+    }
+    return d;
+  }, [isComposite, scores, categoryId, students, subCategories]);
+
+  const compositeStudents = useMemo(() => {
+    const all = students?.students || [];
+    return showDropout ? all : all.filter(s => !s.is_dropout);
+  }, [students, showDropout]);
+
   if (loading || !category) {
     return <div className="p-6 text-muted-foreground">로딩 중...</div>;
   }
@@ -143,15 +184,26 @@ export default function EvalPage({ params }) {
       </div>
 
       {/* Score Table */}
-      <ScoreTable
-        category={category}
-        students={students?.students || []}
-        scores={scores}
-        calculatedResults={scores?.calculated || {}}
-        showDropout={showDropout}
-        onScoreChange={handleScoreChange}
-        onSubCategoryClick={handleSubCategoryClick}
-      />
+      {isComposite ? (
+        <SummaryTable
+          title={category.name}
+          students={compositeStudents}
+          columns={compositeColumns}
+          data={compositeData}
+          onColumnClick={handleSubCategoryClick}
+          showRank={false}
+        />
+      ) : (
+        <ScoreTable
+          category={category}
+          students={students?.students || []}
+          scores={scores}
+          calculatedResults={scores?.calculated || {}}
+          showDropout={showDropout}
+          onScoreChange={handleScoreChange}
+          onSubCategoryClick={handleSubCategoryClick}
+        />
+      )}
 
       {/* Conflict Dialog */}
       <ConflictDialog
