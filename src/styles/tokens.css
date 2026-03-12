@@ -1,0 +1,50 @@
+/* ============================================================
+ * KDA 평가 시스템 — 디자인 토큰
+ * 색상, radius, shadow 등 비레이아웃 스타일을 이 파일에 격리
+ * AI 코딩 시 컨텍스트에서 제외 가능
+ * ============================================================ */
+
+:root {
+  /* ─── 앱 고유 색상 ─── */
+  --color-kda-primary: oklch(0.546 0.245 262.881);
+  --color-kda-primary-light: oklch(0.809 0.105 251.813);
+  --color-kda-primary-dark: oklch(0.424 0.199 265.638);
+
+  /* 사이드바 */
+  --color-sidebar-bg: oklch(0.975 0 0);
+  --color-sidebar-hover: oklch(0.95 0 0);
+
+  /* 중도퇴소 행 */
+  --color-dropout-row: oklch(0.95 0.02 30);
+  --color-dropout-text: oklch(0.6 0.05 30);
+
+  /* 예상 점수 */
+  --color-projected-text: oklch(0.6 0.15 250);
+  --color-projected-bg: oklch(0.95 0.03 250);
+
+  /* 상태 색상 */
+  --color-success: oklch(0.65 0.2 145);
+  --color-warning: oklch(0.75 0.15 75);
+  --color-error: oklch(0.577 0.245 27.325);
+  --color-info: oklch(0.7 0.15 250);
+
+  /* 진행률 바 */
+  --color-progress-fill: oklch(0.546 0.245 262.881);
+  --color-progress-bg: oklch(0.92 0 0);
+
+  /* ─── 그림자 ─── */
+  --shadow-card: 0 1px 3px oklch(0 0 0 / 0.08), 0 1px 2px oklch(0 0 0 / 0.04);
+  --shadow-panel: 0 4px 12px oklch(0 0 0 / 0.12), 0 2px 4px oklch(0 0 0 / 0.06);
+  --shadow-dropdown: 0 8px 24px oklch(0 0 0 / 0.15);
+
+  /* ─── 테이블 ─── */
+  --border-table: oklch(0.9 0 0);
+  --color-table-header-bg: oklch(0.97 0 0);
+  --color-table-row-hover: oklch(0.98 0.01 260);
+  --color-table-stripe: oklch(0.985 0 0);
+
+  /* ─── 기타 ─── */
+  --opacity-disabled: 0.5;
+  --color-bonus-badge: oklch(0.75 0.15 75);
+  --color-bonus-badge-text: oklch(0.35 0.1 75);
+}
