@@ -79,15 +79,15 @@ export default function ScoreTable({
     onScoreChange?.(studentId, fieldId, value);
   }, [onScoreChange]);
 
-  // Enter 키로 다음 행 같은 칼럼으로 포커스 이동
-  const focusNextRow = useCallback((currentRow, currentCol) => {
+  // 행 이동 (Enter: +1, ArrowDown: +1, ArrowUp: -1)
+  const focusRow = useCallback((currentRow, currentCol, direction) => {
     if (!tableRef.current) return;
-    const nextRow = currentRow + 1;
-    const selector = `[data-row="${nextRow}"][data-col="${currentCol}"]`;
-    const nextInput = tableRef.current.querySelector(selector);
-    if (nextInput) {
-      nextInput.focus();
-      nextInput.select();
+    const targetRow = currentRow + direction;
+    const selector = `[data-row="${targetRow}"][data-col="${currentCol}"]`;
+    const targetInput = tableRef.current.querySelector(selector);
+    if (targetInput) {
+      targetInput.focus();
+      targetInput.select();
     }
   }, []);
 
@@ -227,7 +227,7 @@ export default function ScoreTable({
                       onChange={v => handleCellChange(student.id, field.id, v)}
                       row={rowIdx}
                       col={colIdx}
-                      onEnter={focusNextRow}
+                      onNavigate={focusRow}
                       onPaste={handlePaste}
                     />
                   </TableCell>
@@ -247,7 +247,7 @@ export default function ScoreTable({
   );
 }
 
-function ScoreInput({ field, value, onChange, row, col, onEnter, onPaste }) {
+function ScoreInput({ field, value, onChange, row, col, onNavigate, onPaste }) {
   const [localValue, setLocalValue] = useState(value ?? '');
 
   // 부모에서 value prop이 바뀌면 localValue 동기화 (배치 붙여넣기, 외부 갱신 등)
@@ -265,10 +265,14 @@ function ScoreInput({ field, value, onChange, row, col, onEnter, onPaste }) {
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' || e.key === 'ArrowDown') {
       e.preventDefault();
       e.target.blur();
-      onEnter?.(row, col);
+      onNavigate?.(row, col, 1);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      e.target.blur();
+      onNavigate?.(row, col, -1);
     }
   };
 

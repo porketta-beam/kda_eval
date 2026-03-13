@@ -955,12 +955,16 @@ ScoreTable.handlePaste
 → 5명의 점수가 단일 요청으로 서버에 저장
 ```
 
-#### Enter 키 네비게이션
+#### 키보드 셀 네비게이션
 
-셀에서 Enter 입력 시:
-1. 현재 셀의 값을 저장 (blur 트리거 → `onScoreChange` 호출)
-2. 같은 칼럼의 다음 행 셀로 포커스 이동 (`data-row`/`data-col` 기반 querySelector)
-3. 이동한 셀의 텍스트 자동 선택 (select)
+| 키 | 동작 |
+|---|---|
+| **Enter** / **↓** | 값 저장 후 같은 칼럼 다음 행으로 이동 |
+| **↑** | 값 저장 후 같은 칼럼 이전 행으로 이동 |
+
+- `ArrowUp`/`ArrowDown`은 `preventDefault()`로 number input의 기본 증감 동작을 차단
+- 이동 후 대상 셀의 텍스트 자동 선택 (select)
+- `data-row`/`data-col` 속성 기반 querySelector로 대상 셀 탐색
 
 #### Number Input 스피너 숨김
 
