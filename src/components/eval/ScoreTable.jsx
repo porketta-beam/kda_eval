@@ -79,11 +79,12 @@ export default function ScoreTable({
     onScoreChange?.(studentId, fieldId, value);
   }, [onScoreChange]);
 
-  // 행 이동 (Enter: +1, ArrowDown: +1, ArrowUp: -1)
-  const focusRow = useCallback((currentRow, currentCol, direction) => {
+  // 셀 이동 (행: dRow, 열: dCol)
+  const focusCell = useCallback((currentRow, currentCol, dRow, dCol) => {
     if (!tableRef.current) return;
-    const targetRow = currentRow + direction;
-    const selector = `[data-row="${targetRow}"][data-col="${currentCol}"]`;
+    const targetRow = currentRow + dRow;
+    const targetCol = currentCol + dCol;
+    const selector = `[data-row="${targetRow}"][data-col="${targetCol}"]`;
     const targetInput = tableRef.current.querySelector(selector);
     if (targetInput) {
       targetInput.focus();
@@ -227,7 +228,7 @@ export default function ScoreTable({
                       onChange={v => handleCellChange(student.id, field.id, v)}
                       row={rowIdx}
                       col={colIdx}
-                      onNavigate={focusRow}
+                      onNavigate={focusCell}
                       onPaste={handlePaste}
                     />
                   </TableCell>
@@ -268,11 +269,26 @@ function ScoreInput({ field, value, onChange, row, col, onNavigate, onPaste }) {
     if (e.key === 'Enter' || e.key === 'ArrowDown') {
       e.preventDefault();
       e.target.blur();
-      onNavigate?.(row, col, 1);
+      onNavigate?.(row, col, 1, 0);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       e.target.blur();
-      onNavigate?.(row, col, -1);
+      onNavigate?.(row, col, -1, 0);
+    } else if (e.key === 'ArrowLeft') {
+      const pos = e.target.selectionStart;
+      if (pos === 0) {
+        e.preventDefault();
+        e.target.blur();
+        onNavigate?.(row, col, 0, -1);
+      }
+    } else if (e.key === 'ArrowRight') {
+      const pos = e.target.selectionStart;
+      const len = e.target.value.length;
+      if (pos === len) {
+        e.preventDefault();
+        e.target.blur();
+        onNavigate?.(row, col, 0, 1);
+      }
     }
   };
 

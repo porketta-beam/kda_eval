@@ -961,8 +961,11 @@ ScoreTable.handlePaste
 |---|---|
 | **Enter** / **↓** | 값 저장 후 같은 칼럼 다음 행으로 이동 |
 | **↑** | 값 저장 후 같은 칼럼 이전 행으로 이동 |
+| **←** | 커서가 맨 앞일 때, 값 저장 후 같은 행 왼쪽 칼럼으로 이동 |
+| **→** | 커서가 맨 뒤일 때, 값 저장 후 같은 행 오른쪽 칼럼으로 이동 |
 
-- `ArrowUp`/`ArrowDown`은 `preventDefault()`로 number input의 기본 증감 동작을 차단
+- `ArrowUp`/`ArrowDown`은 항상 `preventDefault()`로 number input 증감 차단
+- `ArrowLeft`/`ArrowRight`는 커서 위치를 확인하여 텍스트 편집과 셀 이동을 자연스럽게 전환
 - 이동 후 대상 셀의 텍스트 자동 선택 (select)
 - `data-row`/`data-col` 속성 기반 querySelector로 대상 셀 탐색
 
