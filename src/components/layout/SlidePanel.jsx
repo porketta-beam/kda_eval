@@ -29,6 +29,7 @@ export default function SlidePanel({
   onFullPage,
   onClose,
   onScoreChange,
+  onBulkScoreChange,
   showDropout,
 }) {
   if (!category) return null;
@@ -111,6 +112,7 @@ export default function SlidePanel({
             onScoreChange={(studentId, fieldId, value) => {
               onScoreChange?.(studentId, fieldId, value);
             }}
+            onBulkScoreChange={onBulkScoreChange}
             onSubCategoryClick={onDrillDown}
           />
         </div>

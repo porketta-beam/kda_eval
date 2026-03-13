@@ -20,6 +20,7 @@ export default function ScoreTable({
   calculatedResults,
   showDropout,
   onScoreChange,
+  onBulkScoreChange,
   onSubCategoryClick,
 }) {
   const [sortKey, setSortKey] = useState('name');
@@ -90,7 +91,7 @@ export default function ScoreTable({
     }
   }, []);
 
-  // 엑셀 칼럼 붙여넣기 처리
+  // 엑셀 칼럼 붙여넣기 처리 — 배치로 모아서 단일 요청
   const handlePaste = useCallback((e, startRow, startCol) => {
     const pasteData = e.clipboardData?.getData('text');
     if (!pasteData) return;
@@ -103,6 +104,9 @@ export default function ScoreTable({
     e.preventDefault();
 
     const parsed = rows.map(row => row.split('\t'));
+
+    // 배치 객체: { [studentId]: { [fieldId]: value } }
+    const batch = {};
 
     for (let r = 0; r < parsed.length; r++) {
       const studentIdx = startRow + r;
@@ -125,13 +129,19 @@ export default function ScoreTable({
           value = raw;
         }
 
-        onScoreChange?.(student.id, field.id, value);
+        if (!batch[student.id]) batch[student.id] = {};
+        batch[student.id][field.id] = value;
       }
+    }
+
+    // 단일 배치 요청으로 전송
+    if (Object.keys(batch).length > 0) {
+      onBulkScoreChange?.(batch);
     }
 
     // 붙여넣기 후 셀의 로컬 값도 업데이트하기 위해 blur
     if (document.activeElement) document.activeElement.blur();
-  }, [sortedStudents, inputFields, onScoreChange]);
+  }, [sortedStudents, inputFields, onBulkScoreChange]);
 
   if (isComposite) {
     // Composite table: shows sub-category calculated values

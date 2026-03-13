@@ -887,17 +887,54 @@ pm2 start npm --name "kda-eval" -- start -- -p 80
 1. **이벤트 가로채기**: 각 `<input>`에 `onPaste` 핸들러 등록. 이벤트 발생 시 `e.clipboardData.getData('text')`로 클립보드 텍스트를 읽음
 2. **엑셀 형식 파싱**: 엑셀은 복사 시 셀을 **탭(`\t`)으로 칼럼 구분**, **줄바꿈(`\r\n` 또는 `\n`)으로 행 구분**하여 클립보드에 저장. 이를 `split(/\r?\n/)` → `split('\t')`로 2차원 배열로 변환
 3. **단일 값 판별**: 행이 1개이고 탭이 없으면 일반 붙여넣기(기본 동작)로 처리하여 사용자 경험 보존
-4. **다중 셀 입력**: `e.preventDefault()`로 기본 동작 차단 후, 파싱된 2차원 데이터를 현재 셀 위치(`startRow`, `startCol`)부터 순회하며 `onScoreChange(studentId, fieldId, value)` 호출
-5. **타입 변환**: number 필드는 `Number()` 변환 (NaN이면 건너뜀), boolean 필드는 `'1'`/`'true'` → 1, 그 외 → 0, text 필드는 그대로 사용
-6. **범위 제한**: 학생 수 또는 필드 수를 넘는 데이터는 무시 (배열 경계 체크)
-7. **셀 위치 식별**: 각 input에 `data-row`, `data-col` 속성 부여. 테이블을 감싸는 `ref`의 `querySelector`로 특정 위치의 input을 찾음
+4. **배치 수집**: 파싱된 2차원 데이터를 현재 셀 위치(`startRow`, `startCol`)부터 순회하며, `{ [studentId]: { [fieldId]: value } }` 형태의 배치 객체로 수집
+5. **단일 API 요청**: 수집된 배치 객체를 `onBulkScoreChange(batch)`로 전달 → eval 페이지에서 **단일 PUT 요청**으로 서버에 전송. 낙관적 잠금 버전 충돌 방지
+6. **타입 변환**: number 필드는 `Number()` 변환 (NaN이면 건너뜀), boolean 필드는 `'1'`/`'true'` → 1, 그 외 → 0, text 필드는 그대로 사용
+7. **범위 제한**: 학생 수 또는 필드 수를 넘는 데이터는 무시 (배열 경계 체크)
+8. **셀 위치 식별**: 각 input에 `data-row`, `data-col` 속성 부여. 테이블을 감싸는 `ref`의 `querySelector`로 특정 위치의 input을 찾음
+
+**버전 충돌 해결 — 왜 배치가 필요한가:**
+
+기존에는 붙여넣기 시 셀마다 `onScoreChange`가 호출되어 각각 독립적인 PUT 요청이 발생했다. 이 시스템은 낙관적 잠금(optimistic locking)을 사용하므로:
+
+```
+요청1: PUT scores { student1: { field1: 90 } } expectedVersion=1
+  → 서버: version 1 === 1 ✓ → 저장, version → 2
+요청2: PUT scores { student2: { field1: 85 } } expectedVersion=1
+  → 서버: version 2 !== 1 ✗ → 409 Conflict!
+요청3~N: 전부 409 Conflict
+```
+
+**해결**: 모든 붙여넣기 데이터를 하나의 배치 객체로 모은 뒤 **단일 PUT 요청**으로 전송:
+```
+배치 요청: PUT scores {
+  student1: { field1: 90 },
+  student2: { field1: 85 },
+  student3: { field1: 92 },
+  ...
+} expectedVersion=1
+  → 서버: version 1 === 1 ✓ → 전부 저장, version → 2
+```
+
+`bulkUpdateScores` 서비스가 이미 다중 학생 형식을 지원하므로 API 변경 불필요.
+
+**데이터 흐름:**
+```
+ScoreTable.handlePaste
+  → 클립보드 파싱 → batch 객체 수집
+  → onBulkScoreChange(batch) 호출
+    → eval page: 단일 PUT /api/cohorts/{id}/scores/{categoryId}
+      → score-service.bulkUpdateScores(cohortId, categoryId, batch, version)
+        → writeWithLock: 버전 체크 1회 → 전체 머지 → version++
+          → 성공 → refreshCalculation()
+```
 
 **사용 예시:**
 ```
 엑셀에서 A1:A5 (5명의 점수 칼럼) 복사
 → ScoreTable 첫 번째 학생의 해당 필드 셀 클릭
 → Ctrl+V
-→ 5명의 점수가 순서대로 자동 입력
+→ 5명의 점수가 단일 요청으로 서버에 저장
 ```
 
 #### Enter 키 네비게이션

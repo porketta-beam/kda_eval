@@ -65,6 +65,24 @@ export default function EvalPage({ params }) {
     await refreshCalculation();
   }, [scores?.version, saveScore, refreshCalculation]);
 
+  // 배치 점수 저장 (엑셀 붙여넣기용) — 단일 PUT 요청
+  const handleBulkScoreChange = useCallback(async (batchScores) => {
+    const enc = encodeURIComponent;
+    const res = await fetch(`/api/cohorts/${enc(cohortId)}/scores/${enc(categoryId)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        scores: batchScores,
+        expectedVersion: scores?.version,
+      }),
+    });
+    if (res.status === 409) {
+      setConflictOpen(true);
+      return;
+    }
+    await refreshCalculation();
+  }, [cohortId, categoryId, scores?.version, refreshCalculation]);
+
   const handleConflictKeepMine = useCallback(async () => {
     if (!pendingChange) return;
     setConflictOpen(false);
@@ -206,6 +224,7 @@ export default function EvalPage({ params }) {
             calculatedResults={scores?.calculated || {}}
             showDropout={showDropout}
             onScoreChange={handleScoreChange}
+            onBulkScoreChange={handleBulkScoreChange}
             onSubCategoryClick={handleSubCategoryClick}
           />
           <FieldManager category={category} onSave={handleSettingsSave} />
@@ -233,6 +252,7 @@ export default function EvalPage({ params }) {
           onFullPage={handlePanelFullPage}
           onClose={() => setPanelCategory(null)}
           onScoreChange={handleScoreChange}
+          onBulkScoreChange={handleBulkScoreChange}
           showDropout={showDropout}
         />
       )}
