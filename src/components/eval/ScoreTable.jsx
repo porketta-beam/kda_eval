@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   Table,
   TableBody,
@@ -249,6 +249,11 @@ export default function ScoreTable({
 
 function ScoreInput({ field, value, onChange, row, col, onEnter, onPaste }) {
   const [localValue, setLocalValue] = useState(value ?? '');
+
+  // 부모에서 value prop이 바뀌면 localValue 동기화 (배치 붙여넣기, 외부 갱신 등)
+  useEffect(() => {
+    setLocalValue(value ?? '');
+  }, [value]);
 
   const handleBlur = () => {
     if (field.type === 'number') {

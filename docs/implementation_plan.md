@@ -926,8 +926,12 @@ ScoreTable.handlePaste
     → eval page: 단일 PUT /api/cohorts/{id}/scores/{categoryId}
       → score-service.bulkUpdateScores(cohortId, categoryId, batch, version)
         → writeWithLock: 버전 체크 1회 → 전체 머지 → version++
-          → 성공 → refreshCalculation()
+          → 성공 → refreshCalculation() → fetchScores()
+            → scores state 갱신 → ScoreInput의 value prop 변경
+              → useEffect([value]) → localValue 동기화 → 입력란 UI 반영
 ```
+
+**입력란 동기화**: `ScoreInput`은 로컬 편집을 위해 `localValue` state를 사용하므로, 외부에서 `value` prop이 변경되었을 때 `useEffect`로 `localValue`를 동기화해야 입력란에 새 값이 표시된다.
 
 **사용 예시:**
 ```
