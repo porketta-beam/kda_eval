@@ -43,6 +43,12 @@ export const INPUT_SCOPE = {
   TEAM: 'team',
 };
 
+/** DataTable 칼럼 타입 */
+export const COLUMN_TYPE = {
+  INPUT: 'input',
+  COMPUTED: 'computed',
+};
+
 // ─── 기수 설정 (config.json) ─────────────────────────────────
 
 /**
@@ -192,7 +198,7 @@ export function createEmptyStudentsData() {
 
 /** 빈 점수 데이터 생성 */
 export function createEmptyScoresData() {
-  return { version: 1, raw_scores: {} };
+  return { version: 1, raw_scores: {}, overrides: {} };
 }
 
 /** 평가 카테고리 생성 */

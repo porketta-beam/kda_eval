@@ -6,6 +6,7 @@ import { useCohortDataContext } from '@/hooks/CohortDataContext';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { SCORING_METHOD } from '@/lib/schema';
+import { buildTableColumns, buildCellData, buildResultColumns } from '@/lib/table-helpers';
 import InlineSettings from '@/components/eval/InlineSettings';
 import DataTable from '@/components/eval/DataTable';
 import FieldManager from '@/components/eval/FieldManager';
@@ -38,7 +39,6 @@ export default function EvalPage({ params }) {
     versionRef.current = scores?.version;
   }, [scores?.version]);
 
-  // Fetch calculated scores when category changes
   const refreshCalculation = useCallback(async () => {
     await fetchScores();
   }, [fetchScores]);
@@ -53,58 +53,62 @@ export default function EvalPage({ params }) {
     }
   }, []);
 
-  const saveScore = useCallback(async (studentId, fieldId, value, version) => {
+  // 통합 PUT 핸들러 — scores, overrides 모두 처리
+  const saveToCategoryScores = useCallback(async (body) => {
     const enc = encodeURIComponent;
     const res = await fetch(`/api/cohorts/${enc(cohortId)}/scores/${enc(categoryId)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        scores: { [studentId]: { [fieldId]: value } },
-        expectedVersion: version,
-      }),
-    });
-    return res;
-  }, [cohortId, categoryId]);
-
-  const handleScoreChange = useCallback(async (studentId, fieldId, value) => {
-    const res = await saveScore(studentId, fieldId, value, versionRef.current);
-    if (res.status === 409) {
-      setPendingChange({ studentId, fieldId, value });
-      setConflictOpen(true);
-      return;
-    }
-    await updateVersionFromResponse(res.clone());
-    await refreshCalculation();
-  }, [saveScore, updateVersionFromResponse, refreshCalculation]);
-
-  // 배치 점수 저장 (엑셀 붙여넣기용) — 단일 PUT 요청
-  const handleBulkScoreChange = useCallback(async (batchScores) => {
-    const enc = encodeURIComponent;
-    const res = await fetch(`/api/cohorts/${enc(cohortId)}/scores/${enc(categoryId)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        scores: batchScores,
+        ...body,
         expectedVersion: versionRef.current,
       }),
     });
     if (res.status === 409) {
-      setConflictOpen(true);
-      return;
+      return { conflict: true, res };
     }
     await updateVersionFromResponse(res.clone());
     await refreshCalculation();
+    return { conflict: false, res };
   }, [cohortId, categoryId, updateVersionFromResponse, refreshCalculation]);
+
+  const handleScoreChange = useCallback(async (studentId, fieldId, value) => {
+    const { conflict } = await saveToCategoryScores({
+      scores: { [studentId]: { [fieldId]: value } },
+    });
+    if (conflict) {
+      setPendingChange({ studentId, fieldId, value });
+      setConflictOpen(true);
+    }
+  }, [saveToCategoryScores]);
+
+  const handleBulkScoreChange = useCallback(async (batchScores) => {
+    const { conflict } = await saveToCategoryScores({ scores: batchScores });
+    if (conflict) setConflictOpen(true);
+  }, [saveToCategoryScores]);
+
+  const handleOverrideChange = useCallback(async (studentId, value) => {
+    const { conflict } = await saveToCategoryScores({
+      overrides: { [studentId]: value },
+    });
+    if (conflict) setConflictOpen(true);
+  }, [saveToCategoryScores]);
+
+  const handleBulkOverrideChange = useCallback(async (batch) => {
+    const { conflict } = await saveToCategoryScores({ overrides: batch });
+    if (conflict) setConflictOpen(true);
+  }, [saveToCategoryScores]);
 
   const handleConflictKeepMine = useCallback(async () => {
     if (!pendingChange) return;
     setConflictOpen(false);
     await fetchScores();
-    const freshScores = await fetch(`/api/cohorts/${encodeURIComponent(cohortId)}/scores`).then(r => r.json());
-    await saveScore(pendingChange.studentId, pendingChange.fieldId, pendingChange.value, freshScores.version);
-    await refreshCalculation();
+    // fetchScores updates versionRef via the useEffect, so saveToCategoryScores will use the fresh version
+    await saveToCategoryScores({
+      scores: { [pendingChange.studentId]: { [pendingChange.fieldId]: pendingChange.value } },
+    });
     setPendingChange(null);
-  }, [pendingChange, cohortId, fetchScores, saveScore, refreshCalculation]);
+  }, [pendingChange, fetchScores, saveToCategoryScores]);
 
   const handleConflictUseServer = useCallback(async () => {
     setConflictOpen(false);
@@ -123,44 +127,6 @@ export default function EvalPage({ params }) {
     await refreshCalculation();
   }, [cohortId, categoryId, fetchConfig, refreshCalculation]);
 
-  // Override 저장 (단일)
-  const handleOverrideChange = useCallback(async (studentId, value) => {
-    const enc = encodeURIComponent;
-    const res = await fetch(`/api/cohorts/${enc(cohortId)}/scores/${enc(categoryId)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        overrides: { [studentId]: value },
-        expectedVersion: versionRef.current,
-      }),
-    });
-    if (res.status === 409) {
-      setConflictOpen(true);
-      return;
-    }
-    await updateVersionFromResponse(res.clone());
-    await refreshCalculation();
-  }, [cohortId, categoryId, updateVersionFromResponse, refreshCalculation]);
-
-  // Override 일괄 저장 (엑셀 붙여넣기용) — 단일 PUT 요청
-  const handleBulkOverrideChange = useCallback(async (batch) => {
-    const enc = encodeURIComponent;
-    const res = await fetch(`/api/cohorts/${enc(cohortId)}/scores/${enc(categoryId)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        overrides: batch,
-        expectedVersion: versionRef.current,
-      }),
-    });
-    if (res.status === 409) {
-      setConflictOpen(true);
-      return;
-    }
-    await updateVersionFromResponse(res.clone());
-    await refreshCalculation();
-  }, [cohortId, categoryId, updateVersionFromResponse, refreshCalculation]);
-
   // Weight 변경 → 설정 저장
   const handleWeightChange = useCallback((colId, weight) => {
     if (!category) return;
@@ -174,7 +140,6 @@ export default function EvalPage({ params }) {
   }, [category, handleSettingsSave]);
 
   const handleSubCategoryClick = useCallback((sub) => {
-    // sub는 column 객체일 수 있으므로 실제 카테고리 찾기
     const subCat = (category?.sub_categories || []).find(s => s.id === sub.id);
     if (subCat) {
       setPanelStack([]);
@@ -206,86 +171,28 @@ export default function EvalPage({ params }) {
   const inputFields = category?.input_fields || [];
   const subCategories = category?.sub_categories || [];
 
-  // DataTable columns: input_fields → type='input', sub_categories → type='computed'
-  const tableColumns = useMemo(() => {
-    const cols = [];
-    for (const field of inputFields) {
-      cols.push({
-        id: field.id,
-        name: field.name,
-        type: 'input',
-        fieldType: field.type || 'number',
-        min: field.min,
-        max: field.max,
-        weight: field.weight,
-      });
-    }
-    for (const sub of subCategories) {
-      cols.push({
-        id: sub.id,
-        name: sub.name,
-        type: 'computed',
-        maxScore: sub.max_score,
-        isBonus: sub.is_bonus,
-        clickable: true,
-        weight: sub.weight,
-      });
-    }
-    return cols;
-  }, [inputFields, subCategories]);
+  const tableColumns = useMemo(
+    () => buildTableColumns(inputFields, subCategories),
+    [inputFields, subCategories]
+  );
 
-  // cellData: raw_scores + calculated sub_scores 병합
   const cellData = useMemo(() => {
     const rawScores = scores?.raw_scores?.[categoryId] || {};
     const calcResults = scores?.calculated?.[categoryId] || {};
-    const allStudents = students?.students || [];
-    const d = {};
-    for (const student of allStudents) {
-      d[student.id] = { ...(rawScores[student.id] || {}) };
-      // sub_scores에서 computed 값 추가
-      const result = calcResults[student.id];
-      if (result?.sub_scores) {
-        for (const sub of subCategories) {
-          d[student.id][sub.id] = result.sub_scores[sub.id]?.calculated ?? null;
-        }
-      }
-    }
-    return d;
+    return buildCellData(rawScores, calcResults, students?.students || [], subCategories);
   }, [scores, categoryId, students, subCategories]);
 
-  // 결과 칼럼
-  const resultColumns = useMemo(() => {
-    const calcResults = scores?.calculated?.[categoryId] || {};
-    const cols = [];
-    if (category?.scoring_method === SCORING_METHOD.RANK_DIFFERENTIAL) {
-      cols.push({
-        id: 'rank',
-        label: '순위',
-        getValue: (sid) => calcResults[sid]?.rank ?? null,
-      });
-    }
-    // 점수 칼럼: override가 있으면 override 값 사용
-    const categoryOverrides = scores?.overrides?.[categoryId] || {};
-    cols.push({
-      id: 'score',
-      label: `점수${category?.max_score != null ? ` (${category.max_score})` : ''}`,
-      getValue: (sid) => {
-        const overrideVal = categoryOverrides[sid];
-        if (overrideVal != null) return overrideVal;
-        return calcResults[sid]?.calculated ?? null;
-      },
-    });
-    return cols;
-  }, [scores, categoryId, category]);
-
-  // showWeightRow: 칼럼이 있을 때만
-  const showWeightRow = tableColumns.length > 0 && !isComposite;
-
-  // overrides
-  const categoryOverrides = useMemo(() =>
-    scores?.overrides?.[categoryId] || {},
+  const categoryOverrides = useMemo(
+    () => scores?.overrides?.[categoryId] || {},
     [scores, categoryId]
   );
+
+  const resultColumns = useMemo(() => {
+    const calcResults = scores?.calculated?.[categoryId] || {};
+    return buildResultColumns(category, calcResults, categoryOverrides, true);
+  }, [scores, categoryId, category, categoryOverrides]);
+
+  const showWeightRow = tableColumns.length > 0 && !isComposite;
 
   if (loading || !category) {
     return <div className="p-6 text-muted-foreground">로딩 중...</div>;

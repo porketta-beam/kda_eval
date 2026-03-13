@@ -16,6 +16,7 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { SCORING_METHOD } from '@/lib/schema';
+import { buildTableColumns, buildCellData, buildResultColumns } from '@/lib/table-helpers';
 import DataTable from '@/components/eval/DataTable';
 import InlineSettings from '@/components/eval/InlineSettings';
 
@@ -47,68 +48,20 @@ export default function SlidePanel({
   const inputFields = category.input_fields || [];
   const subCategories = category.sub_categories || [];
 
-  // DataTable columns
-  const tableColumns = useMemo(() => {
-    const cols = [];
-    for (const field of inputFields) {
-      cols.push({
-        id: field.id,
-        name: field.name,
-        type: 'input',
-        fieldType: field.type || 'number',
-        min: field.min,
-        max: field.max,
-        weight: field.weight,
-      });
-    }
-    for (const sub of subCategories) {
-      cols.push({
-        id: sub.id,
-        name: sub.name,
-        type: 'computed',
-        maxScore: sub.max_score,
-        isBonus: sub.is_bonus,
-        clickable: true,
-        weight: sub.weight,
-      });
-    }
-    return cols;
-  }, [inputFields, subCategories]);
+  const tableColumns = useMemo(
+    () => buildTableColumns(inputFields, subCategories),
+    [inputFields, subCategories]
+  );
 
-  // cellData
   const cellData = useMemo(() => {
     const rawScores = scores?.raw_scores?.[category.id] || {};
     const calcResults = scores?.calculated?.[category.id] || {};
-    const d = {};
-    for (const student of students) {
-      d[student.id] = { ...(rawScores[student.id] || {}) };
-      const result = calcResults[student.id];
-      if (result?.sub_scores) {
-        for (const sub of subCategories) {
-          d[student.id][sub.id] = result.sub_scores[sub.id]?.calculated ?? null;
-        }
-      }
-    }
-    return d;
+    return buildCellData(rawScores, calcResults, students, subCategories);
   }, [scores, category.id, students, subCategories]);
 
-  // result columns
   const resultColumns = useMemo(() => {
     const calcResults = scores?.calculated?.[category.id] || {};
-    const cols = [];
-    if (category.scoring_method === SCORING_METHOD.RANK_DIFFERENTIAL) {
-      cols.push({
-        id: 'rank',
-        label: '순위',
-        getValue: (sid) => calcResults[sid]?.rank ?? null,
-      });
-    }
-    cols.push({
-      id: 'score',
-      label: '점수',
-      getValue: (sid) => calcResults[sid]?.calculated ?? null,
-    });
-    return cols;
+    return buildResultColumns(category, calcResults);
   }, [scores, category]);
 
   const handleColumnClick = (col) => {
@@ -180,9 +133,7 @@ export default function SlidePanel({
             students={students}
             cellData={cellData}
             resultColumns={resultColumns}
-            onCellChange={(studentId, colId, value) => {
-              onScoreChange?.(studentId, colId, value);
-            }}
+            onCellChange={onScoreChange}
             onBulkCellChange={onBulkScoreChange}
             onColumnClick={handleColumnClick}
             showDropout={showDropout}

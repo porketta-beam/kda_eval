@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import {
   Table,
   TableBody,
@@ -12,6 +12,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
+import { SCORING_METHOD, COLUMN_TYPE } from '@/lib/schema';
 
 /**
  * 통합 데이터 테이블 — 읽기전용(SummaryTable) + 입력(ScoreTable) 통합
@@ -33,7 +34,7 @@ import { Badge } from '@/components/ui/badge';
  * @param {import('@/lib/schema').Student[]} props.students
  * @param {Object<string, Object<string, *>>} props.cellData - { [studentId]: { [colId]: value } }
  * @param {boolean} [props.showWeightRow]
- * @param {string} [props.scoringMethod] - 'sum_divide' → '배수', 'weighted_average' → '가중치'
+ * @param {string} [props.scoringMethod] - SCORING_METHOD value
  * @param {Function} [props.onWeightChange] - (colId, weight) => void
  * @param {Array<{ id: string, label: string, getValue: (studentId: string) => * }>} [props.resultColumns]
  * @param {Function} [props.onCellChange] - (studentId, colId, value) => void
@@ -65,41 +66,51 @@ export default function DataTable({
   const [sortAsc, setSortAsc] = useState(true);
   const tableRef = useRef(null);
 
-  const activeStudents = showDropout
-    ? students
-    : students.filter(s => !s.is_dropout);
+  const activeStudents = useMemo(
+    () => showDropout ? students : students.filter(s => !s.is_dropout),
+    [students, showDropout]
+  );
 
   const handleSort = (key) => {
     if (sortKey === key) setSortAsc(!sortAsc);
     else { setSortKey(key); setSortAsc(true); }
   };
 
-  // Input 칼럼만 추출 (키보드 네비 + 붙여넣기 대상)
-  const inputColumns = columns.filter(c => c.type === 'input');
+  const inputColumns = useMemo(
+    () => columns.filter(c => c.type === COLUMN_TYPE.INPUT),
+    [columns]
+  );
 
-  const sortedStudents = [...activeStudents].sort((a, b) => {
-    let va, vb;
-    if (sortKey === 'name') {
-      return sortAsc ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
-    }
-    // result column
-    const resultCol = resultColumns.find(rc => rc.id === sortKey);
-    if (resultCol) {
-      va = resultCol.getValue(a.id) ?? (sortKey === 'rank' ? 999 : -Infinity);
-      vb = resultCol.getValue(b.id) ?? (sortKey === 'rank' ? 999 : -Infinity);
-    } else if (sortKey === 'override') {
-      va = overrides?.[a.id] ?? -Infinity;
-      vb = overrides?.[b.id] ?? -Infinity;
-    } else {
-      // data column
-      va = cellData[a.id]?.[sortKey] ?? -Infinity;
-      vb = cellData[b.id]?.[sortKey] ?? -Infinity;
-    }
-    if (typeof va === 'number' && typeof vb === 'number') {
-      return sortAsc ? va - vb : vb - va;
-    }
-    return sortAsc ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va));
-  });
+  // Pre-build col.id → input index map for O(1) lookup per cell
+  const inputColIndexMap = useMemo(() => {
+    const map = {};
+    inputColumns.forEach((c, i) => { map[c.id] = i; });
+    return map;
+  }, [inputColumns]);
+
+  const sortedStudents = useMemo(() => {
+    return [...activeStudents].sort((a, b) => {
+      let va, vb;
+      if (sortKey === 'name') {
+        return sortAsc ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
+      }
+      const resultCol = resultColumns.find(rc => rc.id === sortKey);
+      if (resultCol) {
+        va = resultCol.getValue(a.id) ?? (sortKey === 'rank' ? 999 : -Infinity);
+        vb = resultCol.getValue(b.id) ?? (sortKey === 'rank' ? 999 : -Infinity);
+      } else if (sortKey === 'override') {
+        va = overrides?.[a.id] ?? -Infinity;
+        vb = overrides?.[b.id] ?? -Infinity;
+      } else {
+        va = cellData[a.id]?.[sortKey] ?? -Infinity;
+        vb = cellData[b.id]?.[sortKey] ?? -Infinity;
+      }
+      if (typeof va === 'number' && typeof vb === 'number') {
+        return sortAsc ? va - vb : vb - va;
+      }
+      return sortAsc ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va));
+    });
+  }, [activeStudents, sortKey, sortAsc, resultColumns, overrides, cellData]);
 
   // 셀 이동 (키보드 네비)
   const focusCell = useCallback((currentRow, currentCol, dRow, dCol) => {
@@ -114,19 +125,22 @@ export default function DataTable({
     }
   }, []);
 
+  // 클립보드 텍스트를 2D 배열로 파싱
+  const parseClipboard = useCallback((e) => {
+    const pasteData = e.clipboardData?.getData('text');
+    if (!pasteData) return null;
+    const rows = pasteData.split(/\r?\n/).filter(r => r.length > 0);
+    if (rows.length <= 1 && !rows[0]?.includes('\t')) return null;
+    e.preventDefault();
+    return rows.map(row => row.split('\t'));
+  }, []);
+
   // 엑셀 붙여넣기 — input 칼럼만 대상
   const handlePaste = useCallback((e, startRow, startCol) => {
-    const pasteData = e.clipboardData?.getData('text');
-    if (!pasteData) return;
+    const parsed = parseClipboard(e);
+    if (!parsed) return;
 
-    const rows = pasteData.split(/\r?\n/).filter(r => r.length > 0);
-    if (rows.length <= 1 && !rows[0]?.includes('\t')) return;
-
-    e.preventDefault();
-
-    const parsed = rows.map(row => row.split('\t'));
     const batch = {};
-
     for (let r = 0; r < parsed.length; r++) {
       const studentIdx = startRow + r;
       if (studentIdx >= sortedStudents.length) break;
@@ -158,25 +172,19 @@ export default function DataTable({
     }
 
     if (document.activeElement) document.activeElement.blur();
-  }, [sortedStudents, inputColumns, onBulkCellChange]);
+  }, [sortedStudents, inputColumns, onBulkCellChange, parseClipboard]);
 
   // 엑셀 붙여넣기 — 수정(override) 칼럼 대상
   const handleOverridePaste = useCallback((e, startRow) => {
-    const pasteData = e.clipboardData?.getData('text');
-    if (!pasteData) return;
-
-    const rows = pasteData.split(/\r?\n/).filter(r => r.length > 0);
-    // 단일 값이면 기본 동작 사용
-    if (rows.length <= 1 && !rows[0]?.includes('\t')) return;
-
-    e.preventDefault();
+    const parsed = parseClipboard(e);
+    if (!parsed) return;
 
     const batch = {};
-    for (let r = 0; r < rows.length; r++) {
+    for (let r = 0; r < parsed.length; r++) {
       const studentIdx = startRow + r;
       if (studentIdx >= sortedStudents.length) break;
       const student = sortedStudents[studentIdx];
-      const raw = rows[r].split('\t')[0].trim();
+      const raw = parsed[r][0].trim();
       const value = raw === '' ? null : Number(raw);
       if (value !== null && isNaN(value)) continue;
       batch[student.id] = value;
@@ -187,20 +195,7 @@ export default function DataTable({
     }
 
     if (document.activeElement) document.activeElement.blur();
-  }, [sortedStudents, onBulkOverrideChange]);
-
-  const handleCellChange = useCallback((studentId, colId, value) => {
-    onCellChange?.(studentId, colId, value);
-  }, [onCellChange]);
-
-  const SortHeader = ({ sortId, children, className }) => (
-    <TableHead
-      className={`cursor-pointer select-none hover:bg-accent/50 ${className || ''}`}
-      onClick={() => handleSort(sortId)}
-    >
-      {children} {sortKey === sortId ? (sortAsc ? '↑' : '↓') : '↕'}
-    </TableHead>
-  );
+  }, [sortedStudents, onBulkOverrideChange, parseClipboard]);
 
   const clickableClass = 'text-blue-600 hover:underline cursor-pointer';
 
@@ -210,8 +205,7 @@ export default function DataTable({
     return v;
   };
 
-  // 가중치 라벨
-  const weightLabel = scoringMethod === 'sum_divide' ? '배수' : '가중치';
+  const weightLabel = scoringMethod === SCORING_METHOD.SUM_DIVIDE ? '배수' : '가중치';
 
   const hasOverrideColumn = !!onOverrideChange;
 
@@ -221,10 +215,10 @@ export default function DataTable({
       <Table className="min-w-[60%] w-fit">
         <TableHeader>
           <TableRow>
-            <SortHeader sortId="name">이름</SortHeader>
+            <SortHeader sortKey={sortKey} sortAsc={sortAsc} sortId="name" onSort={handleSort}>이름</SortHeader>
             {columns.map(col => (
-              <SortHeader key={col.id} sortId={col.id} className="text-center">
-                {col.type === 'computed' && col.clickable ? (
+              <SortHeader key={col.id} sortKey={sortKey} sortAsc={sortAsc} sortId={col.id} onSort={handleSort} className="text-center">
+                {col.type === COLUMN_TYPE.COMPUTED && col.clickable ? (
                   <span
                     className={clickableClass}
                     onClick={(e) => { e.stopPropagation(); onColumnClick?.(col); }}
@@ -240,10 +234,10 @@ export default function DataTable({
               </SortHeader>
             ))}
             {hasOverrideColumn && (
-              <SortHeader sortId="override" className="text-center">수정</SortHeader>
+              <SortHeader sortKey={sortKey} sortAsc={sortAsc} sortId="override" onSort={handleSort} className="text-center">수정</SortHeader>
             )}
             {resultColumns.map(rc => (
-              <SortHeader key={rc.id} sortId={rc.id} className={rc.id === 'rank' ? 'text-center' : 'text-right'}>
+              <SortHeader key={rc.id} sortKey={sortKey} sortAsc={sortAsc} sortId={rc.id} onSort={handleSort} className={rc.id === 'rank' ? 'text-center' : 'text-right'}>
                 {rc.label}
               </SortHeader>
             ))}
@@ -288,16 +282,15 @@ export default function DataTable({
               >
                 <TableCell>{student.name}</TableCell>
                 {columns.map((col) => {
-                  if (col.type === 'input') {
-                    const inputIdx = inputColumns.indexOf(col);
+                  if (col.type === COLUMN_TYPE.INPUT) {
                     return (
                       <TableCell key={col.id} className="text-center p-1">
                         <ScoreInput
                           field={{ id: col.id, type: col.fieldType || 'number', min: col.min, max: col.max }}
                           value={studentData[col.id]}
-                          onChange={v => handleCellChange(student.id, col.id, v)}
+                          onChange={v => onCellChange?.(student.id, col.id, v)}
                           row={rowIdx}
-                          col={inputIdx}
+                          col={inputColIndexMap[col.id]}
                           onNavigate={focusCell}
                           onPaste={handlePaste}
                         />
@@ -354,6 +347,20 @@ export default function DataTable({
         </TableBody>
       </Table>
     </div>
+  );
+}
+
+// ─── SortHeader: 정렬 가능한 헤더 셀 ──────────────────────────
+
+function SortHeader({ sortKey, sortAsc, sortId, onSort, children, className }) {
+  const indicator = sortKey === sortId ? (sortAsc ? '↑' : '↓') : '↕';
+  return (
+    <TableHead
+      className={`cursor-pointer select-none hover:bg-accent/50 ${className || ''}`}
+      onClick={() => onSort(sortId)}
+    >
+      {children} {indicator}
+    </TableHead>
   );
 }
 

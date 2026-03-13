@@ -26,7 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { SCORING_METHOD, METHOD_LABELS } from '@/lib/schema';
+import { SCORING_METHOD, METHOD_LABELS, COLUMN_TYPE } from '@/lib/schema';
 import CategoryCard from '@/components/eval/CategoryCard';
 import DataTable from '@/components/eval/DataTable';
 
@@ -69,7 +69,7 @@ export default function CohortDashboard({ params }) {
     categories.map(cat => ({
       id: cat.id,
       name: cat.name,
-      type: 'computed',
+      type: COLUMN_TYPE.COMPUTED,
       maxScore: cat.max_score,
       isBonus: cat.is_bonus,
       clickable: true,
