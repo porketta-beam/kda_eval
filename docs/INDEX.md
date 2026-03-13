@@ -2,13 +2,14 @@
 
 ## 문서 목록
 
-| 문서 | 설명 | 상태 |
-|------|------|------|
-| [INDEX.md](INDEX.md) | 본 문서. 문서 탐색 가이드 | 유지 |
-| [implementation_plan.md](implementation_plan.md) | **구현 계획서 (아키텍처, UI, 데이터 모델)** — Phase 1~6 완료 | 최신 |
-| [scoring_system.md](scoring_system.md) | 2기 점수 계산 체계 분석 (참고용) | 완료 |
-| [folder_structure.md](folder_structure.md) | Google Drive 폴더/파일/시트 구조 | 완료 |
-| [analysis_plan.md](analysis_plan.md) | 분석 계획 (아카이브) | 완료 |
+
+| 문서                                               | 설명                                           | 상태  |
+| ------------------------------------------------ | -------------------------------------------- | --- |
+| [INDEX.md](INDEX.md)                             | 본 문서. 문서 탐색 가이드                              | 유지  |
+| [implementation_plan.md](implementation_plan.md) | **구현 계획서 (아키텍처, UI, 데이터 모델)** — Phase 1~6 완료 | 최신  |
+| [scoring_system.md](scoring_system.md)           | 2기 점수 계산 체계 분석 (참고용)                         | 완료  |
+| [folder_structure.md](folder_structure.md)       | Google Drive 폴더/파일/시트 구조                     | 완료  |
+| [analysis_plan.md](analysis_plan.md)             | 분석 계획 (아카이브)                                 | 완료  |
 
 
 ---
@@ -49,25 +50,30 @@
 
 
 ### 구현 관련
-| 알고 싶은 것 | 참고 문서 | 섹션 |
-|-------------|-----------|------|
-| 기술 스택 및 아키텍처 | implementation_plan.md | `2. 아키텍처` |
-| 데이터 모델 (타입 정의) | implementation_plan.md | `3. 데이터 모델` |
-| 평가 방식 타입 시스템 | implementation_plan.md | `3-2. 평가 방식 타입` |
-| 점수 계산 엔진 설계 | implementation_plan.md | `4. 점수 계산 엔진` |
-| UI 레이아웃/화면 설계 | implementation_plan.md | `5. UI 설계` |
-| 동시성 제어 전략 | implementation_plan.md | `6. 동시성 제어` |
-| 내부망 배포 (kidis.kda) | implementation_plan.md | `7. 내부망 배포` |
-| 핵심 기능 상세 | implementation_plan.md | `8. 핵심 기능 상세` |
-| Playwright 테스트 전략 | implementation_plan.md | `9. 테스트 전략` |
-| 구현 단계/일정 | implementation_plan.md | `10. 구현 단계` |
+
+
+| 알고 싶은 것            | 참고 문서                  | 섹션              |
+| ------------------ | ---------------------- | --------------- |
+| 기술 스택 및 아키텍처       | implementation_plan.md | `2. 아키텍처`       |
+| 데이터 모델 (타입 정의)     | implementation_plan.md | `3. 데이터 모델`     |
+| 평가 방식 타입 시스템       | implementation_plan.md | `3-2. 평가 방식 타입` |
+| 점수 계산 엔진 설계        | implementation_plan.md | `4. 점수 계산 엔진`   |
+| UI 레이아웃/화면 설계      | implementation_plan.md | `5. UI 설계`      |
+| 동시성 제어 전략          | implementation_plan.md | `6. 동시성 제어`     |
+| 내부망 배포 (kidis.kda) | implementation_plan.md | `7. 내부망 배포`     |
+| 핵심 기능 상세           | implementation_plan.md | `8. 핵심 기능 상세`   |
+| Playwright 테스트 전략  | implementation_plan.md | `9. 테스트 전략`     |
+| 구현 단계/일정           | implementation_plan.md | `10. 구현 단계`     |
+
 
 ### Google Sheets MCP 설정
-| 알고 싶은 것 | 참고 |
-|-------------|------|
-| MCP 서버 설정 | `uvx mcp-google-sheets@latest`, 서비스 계정 인증 |
+
+
+| 알고 싶은 것   | 참고                                                    |
+| --------- | ----------------------------------------------------- |
+| MCP 서버 설정 | `uvx mcp-google-sheets@latest`, 서비스 계정 인증             |
 | 서비스 계정 경로 | `C:\Users\server\credentials\google_json_joinus.json` |
-| 기본 폴더 ID | `1WJ70610HnYmSOrfK_4cn8L3PC-6BQ86S` (평가자료) |
-| 폴더 접근 방법 | 서비스 계정 이메일에 폴더 공유 필요 |
+| 기본 폴더 ID  | `1WJ70610HnYmSOrfK_4cn8L3PC-6BQ86S` (평가자료)            |
+| 폴더 접근 방법  | 서비스 계정 이메일에 폴더 공유 필요                                  |
 
 

@@ -40,6 +40,9 @@ export default function StudentsPage({ params }) {
   // 팀 관리 state
   const [teamsOpen, setTeamsOpen] = useState(false);
   const [newTeamName, setNewTeamName] = useState('');
+  const [expandedTeamId, setExpandedTeamId] = useState(null);
+  const [editingTeamId, setEditingTeamId] = useState(null);
+  const [editTeamName, setEditTeamName] = useState('');
 
   const teams = config?.teams || [];
   const studentList = students?.students || [];
@@ -100,11 +103,17 @@ export default function StudentsPage({ params }) {
 
   // ─── 팀 관리 핸들러 ──────────────────────────────
   const saveTeams = async (newTeams) => {
-    await fetch(`/api/cohorts/${enc(cohortId)}/config`, {
+    const updatedConfig = { ...config, teams: newTeams };
+    const res = await fetch(`/api/cohorts/${enc(cohortId)}/config`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...config, teams: newTeams }),
+      body: JSON.stringify({ config: updatedConfig, expectedVersion: config.version }),
     });
+    if (res.status === 409) {
+      alert('다른 사용자가 설정을 변경했습니다. 새로고침 후 다시 시도하세요.');
+      await fetchConfig();
+      return;
+    }
     await fetchConfig();
   };
 
@@ -133,9 +142,41 @@ export default function StudentsPage({ params }) {
     await saveTeams(updatedTeams);
   };
 
+  const handleRenameTeam = async (teamId) => {
+    if (!editTeamName.trim()) return;
+    await saveTeams(teams.map(t =>
+      t.id === teamId ? { ...t, name: editTeamName.trim() } : t
+    ));
+    setEditingTeamId(null);
+  };
+
+  const handleRemoveFromTeam = async (teamId, studentId) => {
+    await saveTeams(teams.map(t =>
+      t.id === teamId ? { ...t, members: t.members.filter(m => m !== studentId) } : t
+    ));
+  };
+
+  const handleAddToTeam = async (teamId, studentId) => {
+    // 다른 팀에서 제거 후 추가
+    await saveTeams(teams.map(t => {
+      const filtered = t.members.filter(m => m !== studentId);
+      return t.id === teamId ? { ...t, members: [...filtered, studentId] } : { ...t, members: filtered };
+    }));
+  };
+
   const getStudentTeam = (studentId) => {
     return teams.find(t => t.members?.includes(studentId));
   };
+
+  const getTeamMembers = (teamId) => {
+    const team = teams.find(t => t.id === teamId);
+    if (!team) return [];
+    return team.members.map(mid => studentList.find(s => s.id === mid)).filter(Boolean);
+  };
+
+  const unassignedStudents = studentList.filter(s =>
+    !s.is_dropout && !teams.some(t => t.members?.includes(s.id))
+  );
 
   return (
     <div className="p-6 max-w-4xl">
@@ -160,15 +201,80 @@ export default function StudentsPage({ params }) {
             <Button size="sm" onClick={handleAddTeam} disabled={!newTeamName.trim()}>추가</Button>
           </div>
           {teams.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {teams.map(team => (
-                <div key={team.id} className="flex items-center gap-1 border rounded-md px-2 py-1 text-sm">
-                  <span>{team.name}</span>
-                  <span className="text-muted-foreground">({team.members?.length || 0}명)</span>
-                  <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-destructive"
-                    onClick={() => handleDeleteTeam(team.id)}>×</Button>
-                </div>
-              ))}
+            <div className="space-y-2">
+              {teams.map(team => {
+                const members = getTeamMembers(team.id);
+                const isExpanded = expandedTeamId === team.id;
+                const isEditing = editingTeamId === team.id;
+                return (
+                  <div key={team.id} className="border rounded-lg overflow-hidden">
+                    <div className="flex items-center gap-2 px-3 py-2 bg-accent/30">
+                      <button
+                        className="text-xs text-muted-foreground"
+                        onClick={() => setExpandedTeamId(isExpanded ? null : team.id)}
+                      >
+                        {isExpanded ? '▼' : '▶'}
+                      </button>
+                      {isEditing ? (
+                        <div className="flex items-center gap-1">
+                          <Input
+                            value={editTeamName}
+                            onChange={e => setEditTeamName(e.target.value)}
+                            className="h-7 w-32 text-sm"
+                            onKeyDown={e => e.key === 'Enter' && handleRenameTeam(team.id)}
+                            autoFocus
+                          />
+                          <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleRenameTeam(team.id)}>✓</Button>
+                          <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setEditingTeamId(null)}>✗</Button>
+                        </div>
+                      ) : (
+                        <span
+                          className="font-medium text-sm cursor-pointer hover:underline"
+                          onClick={() => { setEditingTeamId(team.id); setEditTeamName(team.name); }}
+                        >
+                          {team.name}
+                        </span>
+                      )}
+                      <span className="text-xs text-muted-foreground">({members.length}명)</span>
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0 ml-auto text-destructive hover:text-destructive"
+                        onClick={() => handleDeleteTeam(team.id)}>×</Button>
+                    </div>
+                    {isExpanded && (
+                      <div className="px-3 py-2 space-y-2">
+                        {members.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {members.map(s => (
+                              <div key={s.id} className="flex items-center gap-1 bg-accent/50 rounded px-2 py-0.5 text-sm">
+                                <span>{s.name}</span>
+                                <button
+                                  className="text-destructive hover:text-destructive/80 text-xs ml-0.5"
+                                  onClick={() => handleRemoveFromTeam(team.id, s.id)}
+                                >×</button>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">팀원이 없습니다.</p>
+                        )}
+                        {unassignedStudents.length > 0 && (
+                          <div className="pt-1 border-t">
+                            <Select onValueChange={(v) => handleAddToTeam(team.id, v)}>
+                              <SelectTrigger className="h-7 w-40 text-xs">
+                                <SelectValue placeholder="+ 학생 배정" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {unassignedStudents.map(s => (
+                                  <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </CollapsibleContent>
