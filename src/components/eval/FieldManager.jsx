@@ -122,14 +122,16 @@ function LeafManager({ category, onSave, open, setOpen }) {
               <>
                 <Label className="text-xs text-muted-foreground ml-1">min</Label>
                 <Input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   value={field.min ?? ''}
                   onChange={e => handleFieldChange(field.id, 'min', e.target.value === '' ? undefined : Number(e.target.value))}
                   className="h-7 w-16 text-sm"
                 />
                 <Label className="text-xs text-muted-foreground">max</Label>
                 <Input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   value={field.max ?? ''}
                   onChange={e => handleFieldChange(field.id, 'max', e.target.value === '' ? undefined : Number(e.target.value))}
                   className="h-7 w-16 text-sm"
@@ -233,9 +235,10 @@ function CompositeManager({ category, onSave, open, setOpen }) {
             />
             <Label className="text-xs text-muted-foreground ml-1">만점</Label>
             <Input
-              type="number"
+              type="text"
+              inputMode="numeric"
               value={sub.max_score}
-              onChange={e => handleSubChange(sub.id, 'max_score', Number(e.target.value) || 0)}
+              onChange={e => handleSubChange(sub.id, 'max_score', e.target.value === '' ? '' : Number(e.target.value) || 0)}
               className="h-7 w-16 text-sm"
             />
             <Select

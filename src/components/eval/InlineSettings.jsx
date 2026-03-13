@@ -19,6 +19,11 @@ import {
 } from '@/components/ui/collapsible';
 import { SCORING_METHOD } from '@/lib/schema';
 
+// 빈 문자열 허용 number 변환 (입력 중 0 삭제 가능)
+const numVal = (v) => v === '' ? '' : Number(v);
+// 저장 시 빈 문자열 → 0 변환
+const toNum = (v) => (v === '' || v == null) ? 0 : Number(v);
+
 export default function InlineSettings({ category, onSave }) {
   const [open, setOpen] = useState(false);
   const [local, setLocal] = useState({ ...category });
@@ -35,7 +40,17 @@ export default function InlineSettings({ category, onSave }) {
   };
 
   const handleSave = () => {
-    onSave?.(local);
+    // 저장 시 빈 문자열을 숫자로 변환
+    const data = {
+      ...local,
+      max_score: toNum(local.max_score),
+      config: Object.fromEntries(
+        Object.entries(local.config || {}).map(([k, v]) =>
+          [k, typeof v === 'string' && v !== '' && !isNaN(v) ? Number(v) : v]
+        ),
+      ),
+    };
+    onSave?.(data);
   };
 
   return (
@@ -52,9 +67,10 @@ export default function InlineSettings({ category, onSave }) {
           <div>
             <Label className="text-sm">만점</Label>
             <Input
-              type="number"
+              type="text"
+              inputMode="numeric"
               value={local.max_score}
-              onChange={e => handleChange('max_score', Number(e.target.value))}
+              onChange={e => handleChange('max_score', numVal(e.target.value))}
               className="h-8"
             />
           </div>
@@ -99,7 +115,7 @@ function MethodConfig({ method, config, onChange }) {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <Label className="text-sm">multiplier</Label>
-            <Input type="number" value={config.multiplier ?? 1} onChange={e => onChange('multiplier', Number(e.target.value))} className="h-8" />
+            <Input type="text" inputMode="numeric" value={config.multiplier ?? 1} onChange={e => onChange('multiplier', numVal(e.target.value))} className="h-8" />
           </div>
           <div className="flex items-end gap-2">
             <Checkbox checked={config.exclude_empty ?? true} onCheckedChange={v => onChange('exclude_empty', v)} />
@@ -112,7 +128,7 @@ function MethodConfig({ method, config, onChange }) {
       return (
         <div>
           <Label className="text-sm">divisor</Label>
-          <Input type="number" value={config.divisor ?? 1} onChange={e => onChange('divisor', Number(e.target.value))} className="h-8 w-32" />
+          <Input type="text" inputMode="numeric" value={config.divisor ?? 1} onChange={e => onChange('divisor', numVal(e.target.value))} className="h-8 w-32" />
         </div>
       );
 
@@ -121,17 +137,17 @@ function MethodConfig({ method, config, onChange }) {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <Label className="text-sm">1위 점수</Label>
-            <Input type="number" value={config.top_score ?? 0} onChange={e => onChange('top_score', Number(e.target.value))} className="h-8" />
+            <Input type="text" inputMode="numeric" value={config.top_score ?? 0} onChange={e => onChange('top_score', numVal(e.target.value))} className="h-8" />
           </div>
           <div>
             <Label className="text-sm">간격</Label>
-            <Input type="number" value={config.interval ?? 5} onChange={e => onChange('interval', Number(e.target.value))} className="h-8" />
+            <Input type="text" inputMode="numeric" value={config.interval ?? 5} onChange={e => onChange('interval', numVal(e.target.value))} className="h-8" />
           </div>
           <div className="flex items-center gap-2">
             <Checkbox checked={config.has_floor ?? false} onCheckedChange={v => onChange('has_floor', v)} />
             <Label className="text-sm">하한 적용</Label>
             {config.has_floor && (
-              <Input type="number" value={config.floor_value ?? 0} onChange={e => onChange('floor_value', Number(e.target.value))} className="h-8 w-20" />
+              <Input type="text" inputMode="numeric" value={config.floor_value ?? 0} onChange={e => onChange('floor_value', numVal(e.target.value))} className="h-8 w-20" />
             )}
           </div>
           <div>
@@ -161,11 +177,11 @@ function MethodConfig({ method, config, onChange }) {
           </div>
           <div>
             <Label className="text-sm">기준</Label>
-            <Input type="number" value={config.params?.threshold ?? 90} onChange={e => onChange('params', { ...config.params, threshold: Number(e.target.value) })} className="h-8" />
+            <Input type="text" inputMode="numeric" value={config.params?.threshold ?? 90} onChange={e => onChange('params', { ...config.params, threshold: numVal(e.target.value) })} className="h-8" />
           </div>
           <div>
             <Label className="text-sm">차감한도</Label>
-            <Input type="number" value={config.params?.cap ?? 10} onChange={e => onChange('params', { ...config.params, cap: Number(e.target.value) })} className="h-8" />
+            <Input type="text" inputMode="numeric" value={config.params?.cap ?? 10} onChange={e => onChange('params', { ...config.params, cap: numVal(e.target.value) })} className="h-8" />
           </div>
         </div>
       );

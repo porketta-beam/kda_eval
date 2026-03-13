@@ -210,7 +210,8 @@ export default function CohortDashboard({ params }) {
             <div>
               <Label className="text-sm">기본 만점</Label>
               <Input
-                type="number"
+                type="text"
+                inputMode="numeric"
                 value={aggMaxScore}
                 onChange={e => setAggMaxScore(e.target.value)}
                 onBlur={() => handleAggSettingChange('max_score', aggMaxScore)}
@@ -220,7 +221,8 @@ export default function CohortDashboard({ params }) {
             <div>
               <Label className="text-sm">가산점 한도</Label>
               <Input
-                type="number"
+                type="text"
+                inputMode="numeric"
                 value={aggBonusLimit}
                 onChange={e => setAggBonusLimit(e.target.value)}
                 onBlur={() => handleAggSettingChange('bonus_limit', aggBonusLimit)}
@@ -306,7 +308,7 @@ export default function CohortDashboard({ params }) {
             </div>
             <div>
               <Label>만점</Label>
-              <Input type="number" value={newCatMax} onChange={e => setNewCatMax(e.target.value)} />
+              <Input type="text" inputMode="numeric" value={newCatMax} onChange={e => setNewCatMax(e.target.value)} />
             </div>
             <div>
               <Label>평가 방식</Label>

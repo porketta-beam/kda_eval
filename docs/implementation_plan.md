@@ -969,9 +969,11 @@ ScoreTable.handlePaste
 - 이동 후 대상 셀의 텍스트 자동 선택 (select)
 - `data-row`/`data-col` 속성 기반 querySelector로 대상 셀 탐색
 
-#### Number Input 스피너 숨김
+#### Number Input 스피너 숨김 및 편집 개선
 
-`globals.css`에서 `input[type="number"]`의 WebKit/Firefox 스피너를 전역으로 숨김 처리하여, 호버/포커스 시 화살표가 나타나지 않음.
+- ScoreTable 입력란: `type="number"` 유지 + `globals.css`에서 스피너 전역 숨김 (화살표 키는 셀 이동으로 사용)
+- 설정 입력란 (InlineSettings, FieldManager, 대시보드): `type="text" inputMode="numeric"`으로 변경하여 스피너 원천 제거 + 0 삭제 가능
+  - `numVal()` 헬퍼: 입력 중 빈 문자열 허용, 저장 시 `toNum()`으로 숫자 변환
 
 ---
 
