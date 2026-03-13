@@ -20,7 +20,8 @@ export async function GET(request, { params }) {
 
     if (!config) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-    const results = calculateTotals(config, scoresData.raw_scores, studentsData.students);
+    const overrides = scoresData.overrides || {};
+    const results = calculateTotals(config, scoresData.raw_scores, studentsData.students, overrides);
 
     const csv = type === 'detail'
       ? exportDetailCSV(config, studentsData.students, results)

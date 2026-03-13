@@ -21,6 +21,40 @@ const METHOD_MAP = {
 };
 
 /**
+ * 하위항목을 가상 input_field로 변환하여 기존 필드에 병합
+ */
+function buildAugmentedCategory(category, subCategories) {
+  const virtualFields = subCategories.map(sub => ({
+    id: sub.id,
+    name: sub.name,
+    type: 'number',
+    per: 'student',
+    weight: sub.weight ?? 1,
+  }));
+
+  return {
+    ...category,
+    input_fields: [...(category.input_fields || []), ...virtualFields],
+  };
+}
+
+/**
+ * raw 입력값 + 하위항목 calculated 값을 병합한 스코어 생성
+ */
+function buildAugmentedScores(categoryScores, subResults, subCategories, students) {
+  const augmented = {};
+  for (const student of students) {
+    augmented[student.id] = {
+      ...(categoryScores[student.id] || {}),
+    };
+    for (const sub of subCategories) {
+      augmented[student.id][sub.id] = subResults[sub.id]?.[student.id]?.calculated ?? 0;
+    }
+  }
+  return augmented;
+}
+
+/**
  * 단일 카테고리 계산
  * @param {import('@/lib/schema').EvaluationCategory} category
  * @param {Object} allRawScores - scores.json의 raw_scores 전체
@@ -42,8 +76,40 @@ export function calculateCategory(category, allRawScores, students, teams = []) 
     return method.calculate(category, allRawScores, activeStudents, teams);
   }
 
-  // 일반 방식: 해당 카테고리의 raw scores만 추출
   const categoryScores = allRawScores[category.id] || {};
+  const subCategories = category.sub_categories || [];
+
+  // 하위항목이 있는 비-composite 카테고리 → augmented 경로
+  if (subCategories.length > 0) {
+    // 1. 하위항목 재귀 계산
+    const subResults = {};
+    for (const sub of subCategories) {
+      subResults[sub.id] = calculateCategory(sub, allRawScores, students, teams);
+    }
+
+    // 2. augmented category 생성 (input_fields + 하위항목을 가상 필드로 병합)
+    const augmentedCategory = buildAugmentedCategory(category, subCategories);
+
+    // 3. augmented scores 생성 (raw 입력값 + 하위항목 calculated 병합)
+    const augmentedScores = buildAugmentedScores(categoryScores, subResults, subCategories, activeStudents);
+
+    // 4. 기존 method로 계산
+    const results = method.calculate(augmentedCategory, augmentedScores, activeStudents, teams);
+
+    // 5. 결과에 sub_scores 첨부
+    for (const student of activeStudents) {
+      if (results[student.id]) {
+        results[student.id].sub_scores = {};
+        for (const sub of subCategories) {
+          results[student.id].sub_scores[sub.id] = subResults[sub.id]?.[student.id] ?? { calculated: 0 };
+        }
+      }
+    }
+
+    return results;
+  }
+
+  // 일반 방식: 해당 카테고리의 raw scores만 추출
   return method.calculate(category, categoryScores, activeStudents, teams);
 }
 
@@ -65,8 +131,9 @@ export function calculateAllCategories(config, rawScores, students) {
 /**
  * 총점 + 순위 계산
  * aggregation_settings: { method: 'sum'|'weighted', max_score, bonus_limit }
+ * @param {Object} [overrides] - { [categoryId]: { [studentId]: number|null } }
  */
-export function calculateTotals(config, rawScores, students) {
+export function calculateTotals(config, rawScores, students, overrides = {}) {
   const categoryResults = calculateAllCategories(config, rawScores, students);
   const activeStudents = students.filter(s => !s.is_dropout);
   const totals = {};
@@ -81,7 +148,9 @@ export function calculateTotals(config, rawScores, students) {
 
     for (const category of config.evaluation_categories) {
       const result = categoryResults[category.id]?.[student.id];
-      const score = result?.calculated ?? 0;
+      // override가 있으면 해당 값 사용, 없으면 calculated 사용
+      const overrideVal = overrides[category.id]?.[student.id];
+      const score = (overrideVal != null) ? overrideVal : (result?.calculated ?? 0);
       breakdown[category.id] = {
         name: category.name,
         max_score: category.max_score,
@@ -119,7 +188,7 @@ export function calculateTotals(config, rawScores, students) {
 /**
  * 예상 점수 계산: 미입력 항목을 전체 평균으로 대체
  */
-export function calculateProjectedScores(config, rawScores, students) {
+export function calculateProjectedScores(config, rawScores, students, overrides = {}) {
   const activeStudents = students.filter(s => !s.is_dropout);
 
   // 먼저 실제 계산 수행
@@ -146,14 +215,17 @@ export function calculateProjectedScores(config, rawScores, students) {
 
     for (const category of config.evaluation_categories) {
       const result = actualResults[category.id]?.[student.id];
+      // override 확인
+      const overrideVal = overrides[category.id]?.[student.id];
+      const hasOverride = overrideVal != null;
       const hasValue = result?.calculated !== null && result?.calculated !== undefined;
-      const score = hasValue ? result.calculated : categoryAverages[category.id];
+      const score = hasOverride ? overrideVal : (hasValue ? result.calculated : categoryAverages[category.id]);
 
       breakdown[category.id] = {
         name: category.name,
         max_score: category.max_score,
         score: Math.round(score * 100) / 100,
-        is_projected: !hasValue,
+        is_projected: !hasOverride && !hasValue,
         is_bonus: category.is_bonus,
       };
       total += score;

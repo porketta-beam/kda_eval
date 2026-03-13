@@ -77,10 +77,10 @@ kda_eval/
 │   │   ├── page.js                       # 기수 관리 홈 (생성, 복제, 삭제)
 │   │   ├── cohort/[id]/
 │   │   │   ├── layout.jsx                # 기수 레이아웃 (탭 + 사이드바 + CohortDataContext, 메인 콘텐츠 w-[80%] 중앙정렬)
-│   │   │   ├── page.jsx                  # ★ 총점 대시보드 (SummaryTable + 항목 관리 Collapsible + 집계 설정)
+│   │   │   ├── page.jsx                  # ★ 총점 대시보드 (DataTable + 항목 관리 Collapsible + 집계 설정)
 │   │   │   ├── students/page.jsx         # 학생 명단 관리 + 팀 관리
 │   │   │   └── eval/[categoryId]/
-│   │   │       └── page.jsx              # ★ 항목별 점수 입력 (리프: ScoreTable, 복합: SummaryTable) + 인라인 설정 + FieldManager + ConflictDialog
+│   │   │       └── page.jsx              # ★ 항목별 점수 입력 (통합 DataTable) + 인라인 설정 + FieldManager + ConflictDialog
 │   │   └── api/
 │   │       └── cohorts/
 │   │           ├── route.js              # GET/POST (목록, 생성 — UUID 자동, 이름 중복 체크)
@@ -107,10 +107,9 @@ kda_eval/
 │   │   │   ├── Sidebar.jsx               # 우측 총점 사이드바 (접기/드래그 리사이즈 180~500px, 누적/예상 모드)
 │   │   │   └── SlidePanel.jsx            # ★ 하위 항목 슬라이드 오버 패널
 │   │   ├── eval/
-│   │   │   ├── ScoreTable.jsx            # 점수 입력 테이블 (리프 항목 전용, min-w-[60%] w-fit)
-│   │   │   ├── SummaryTable.jsx          # ★ 읽기 전용 총점/복합 테이블 (대시보드 + 복합 카테고리 공용, min-w-[60%] w-fit)
+│   │   │   ├── DataTable.jsx             # ★ 통합 데이터 테이블 (입력+읽기전용, 가중치 행, 오버라이드 칼럼, 엑셀 붙여넣기)
 │   │   │   ├── InlineSettings.jsx        # ★ 인라인 설정 패널 (방식별 동적 폼)
-│   │   │   ├── FieldManager.jsx          # ★ 항목 관리 Collapsible (leaf: input_fields, composite: sub_categories)
+│   │   │   ├── FieldManager.jsx          # ★ 항목 관리 Collapsible (leaf: input_fields + weight, composite: sub_categories + weight)
 │   │   │   └── CategoryCard.jsx          # 카테고리 카드 (목록용, 삭제/순서 변경 버튼 포함)
 │   │   ├── common/
 │   │   │   └── ConflictDialog.jsx        # 낙관적 잠금 충돌 다이얼로그
@@ -265,7 +264,8 @@ export const INPUT_SCOPE = {
  * @property {string} scoring_method  - SCORING_METHOD 값
  * @property {Object} config          - 방식별 세부 설정 (아래 참조)
  * @property {InputField[]} input_fields - 입력 필드 정의
- * @property {EvaluationCategory[]} [sub_categories] - 하위 항목 (재귀)
+ * @property {number} [weight]        - 가중치 (하위항목으로 사용 시, 기본 1)
+ * @property {EvaluationCategory[]} sub_categories - 하위 항목 (모든 카테고리에 기본 [])
  */
 
 
@@ -332,6 +332,7 @@ export const INPUT_SCOPE = {
  * @property {string} per             - INPUT_SCOPE 값
  * @property {number} [min]
  * @property {number} [max]
+ * @property {number} [weight]        - 가중치 (기본 1)
  * @property {Array<{label: string, value: *}>} [options]
  */
 
@@ -362,6 +363,8 @@ export const INPUT_SCOPE = {
  * @property {number} version
  * @property {Object<string, Object<string, Object<string, number|boolean|string>>>} raw_scores
  *   구조: { [category_id]: { [student_id]: { [field_id]: value } } }
+ * @property {Object<string, Object<string, number|null>>} [overrides]
+ *   구조: { [category_id]: { [student_id]: number|null } } — 점수 오버라이드
  */
 
 
@@ -387,11 +390,11 @@ export function createEmptyStudentsData() {
 
 /** 빈 점수 데이터 생성 */
 export function createEmptyScoresData() {
-  return { version: 1, raw_scores: {} };
+  return { version: 1, raw_scores: {}, overrides: {} };
 }
 ```
 
-**핵심 설계 원칙**: `scores.json`은 **원본 입력값만** 저장. 환산 점수는 저장하지 않고 scoring engine이 config + raw_scores로 **실시간 계산**.
+**핵심 설계 원칙**: `scores.json`은 **원본 입력값 + 오버라이드**만 저장. 환산 점수는 저장하지 않고 scoring engine이 config + raw_scores로 **실시간 계산**. 오버라이드가 있으면 해당 카테고리의 계산 점수를 덮어쓰고, 삭제하면 계산 점수로 복원.
 
 ---
 
@@ -423,14 +426,14 @@ scoringEngine.calculate(category, rawScores, students)
   ├─ [팀내 평가] 5항목+추천 → weighted_sum → rank → rank_differential(30점, 간격5, 하한10)
   └─ composite: (키움 + 학생 + 팀내) / 100 × 20
 
-[수업참여도] 6과목 → weighted_average(multiplier=2, exclude_empty=true)
-[협업및태도] 9항목 → sum_divide(divisor=10)
+[수업참여도] 6과목 → weighted_average(multiplier=2, exclude_empty=true) — 필드별 weight 지원
+[협업및태도] 9항목 → sum_divide(divisor=10) — 필드별 weight 지원
 [성장가능성] 6과목 → weighted_average(multiplier=1, exclude_empty=true)
 [동료추천]   → user_input (운영자 수동 배정)
 [출석가산점] → boolean_with_deduction(base=2, 공과차감규칙)
 [복수강사추천] → boolean(true=1, false=0)
 
-총점 = SUM(all categories)
+총점 = SUM(all categories) — overrides 있으면 해당 카테고리는 override 값 사용
 순위 = RANK(총점, descending)
 ```
 
@@ -516,7 +519,7 @@ scoringEngine.calculate(category, rawScores, students)
 │ 학생: 28명 (중도퇴소 6명)                          │  95.2   │
 │ ☐ 중도퇴소 인원 표시                               │ 윤세인  │
 │                                                    │  93.1   │
-│ ┌─── 총점 (SummaryTable) ────────────────────┐   │ 오준협  │
+│ ┌─── 총점 (DataTable) ──────────────────────┐   │ 오준협  │
 │ │ 이름↕│출석률(20)↕│1차(15)↕│...│총점↕│순위↕│   │  88.5   │
 │ │──────│──────────│────────│───│─────│─────│   │  ...    │
 │ │강일구 │  20.0    │  13.5  │...│95.2 │  1  │   │         │
@@ -545,7 +548,7 @@ scoringEngine.calculate(category, rawScores, students)
 └──────────────────────────────────────────────────────────────┘
 ```
 
-- **SummaryTable**: 학생 × 카테고리 점수 + 총점 + 순위를 한눈에 표시. 칼럼 헤더/셀 클릭 시 해당 카테고리 eval 페이지로 이동. 가산점 칼럼에는 Badge 표시. 모든 칼럼 정렬 가능
+- **DataTable**: 학생 × 카테고리 점수 + 총점 + 순위를 한눈에 표시. 칼럼 헤더/셀 클릭 시 해당 카테고리 eval 페이지로 이동. 가산점 칼럼에는 Badge 표시. 모든 칼럼 정렬 가능. 입력/읽기전용/가중치행/오버라이드 칼럼 통합 지원
 - **항목 관리**: Collapsible로 접혀 있으며, 펼치면 CategoryCard 리스트 + 추가 버튼 표시
 - 상단 **⚙ 총점 집계 설정**: 하위 항목들을 어떻게 합산할지 (단순합산, 가중합산 등) 설정
 
@@ -580,7 +583,7 @@ scoringEngine.calculate(category, rawScores, students)
 └──────────────────────────────────────────────────────────────┘
 ```
 
-#### 복합 항목 (예: 1차 프로젝트) — SummaryTable 사용
+#### 복합 항목 (예: 1차 프로젝트) — DataTable 사용
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │ ◀ 평가 항목 목록  ›  1차 프로젝트                            │
@@ -591,7 +594,7 @@ scoringEngine.calculate(category, rawScores, students)
 │ │ [+ 하위 항목 추가]                                        ││
 │ └───────────────────────────────────────────────────────────┘│
 │                                                              │
-│ SummaryTable (showRank=false)                                │
+│ DataTable (resultColumns=[점수])                              │
 │ ┌───────────────────────────────────────────────────────┐   │
 │ │ 이름 ↕ │ 팀평가(60) ↕ │ 개인평가(40) ↕ │ 총점 ↕    │   │
 │ │────────│─────────────│───────────────│────────────│   │
@@ -603,9 +606,10 @@ scoringEngine.calculate(category, rawScores, students)
 │   패널 열림 (리프 칼럼은 클릭 불가, 일반 텍스트 표시)        │
 └──────────────────────────────────────────────────────────────┘
 ```
-- 복합 항목은 ScoreTable 대신 **SummaryTable** 렌더링 (읽기 전용, 순위 미표시)
-- 대시보드의 SummaryTable과 동일 컴포넌트 재사용
-- 테이블 아래 **FieldManager** Collapsible: leaf → input_fields 추가/삭제/순서변경, composite → sub_categories 추가/삭제/순서변경
+- 모든 카테고리(리프/복합/혼합)는 단일 **DataTable** 렌더링 — input_fields는 입력 칼럼, sub_categories는 읽기전용 칼럼으로 표시
+- 가중치 행(showWeightRow): 칼럼별 weight 편집 가능
+- 수정 칼럼(override): 점수 칼럼 왼쪽에 직접 입력 → 계산 점수 덮어쓰기, 비우면 복원
+- 테이블 아래 **FieldManager** Collapsible: leaf → input_fields + weight 관리, composite → sub_categories + weight 관리
 - 테이블 너비: `min-w-[60%] w-fit` — 최소 60%, 내용에 따라 확장, 100% 초과 시 횡스크롤
 - 메인 콘텐츠 영역: `w-[80%] mx-auto` 중앙정렬
 - **데이터 입력 기능**: 중도퇴소자도 입력 가능, Enter로 다음 행 이동, 엑셀 칼럼 붙여넣기 지원, number input 스피너 숨김
@@ -878,9 +882,9 @@ pm2 start npm --name "kda-eval" -- start -- -p 80
 
 ### 8-6. 데이터 입력 UX
 
-#### 엑셀 붙여넣기 (ScoreTable)
+#### 엑셀 붙여넣기 (DataTable)
 
-엑셀에서 칼럼(또는 범위)을 복사한 뒤 ScoreTable의 셀에 붙여넣으면, 해당 셀부터 아래/오른쪽 방향으로 데이터가 자동 입력된다.
+엑셀에서 칼럼(또는 범위)을 복사한 뒤 DataTable의 셀에 붙여넣으면, 해당 셀부터 아래/오른쪽 방향으로 데이터가 자동 입력된다. 입력 칼럼과 수정(override) 칼럼 모두 지원.
 
 **구현 상세:**
 
@@ -932,11 +936,11 @@ pm2 start npm --name "kda-eval" -- start -- -p 80
 2번째 붙여넣기: versionRef=2 → PUT → 성공 → 응답 version=3 → versionRef=3
 ```
 
-**데이터 흐름:**
+**데이터 흐름 (입력 칼럼):**
 ```
-ScoreTable.handlePaste
+DataTable.handlePaste
   → 클립보드 파싱 → batch 객체 수집
-  → onBulkScoreChange(batch) 호출
+  → onBulkCellChange(batch) 호출
     → eval page: 단일 PUT /api/cohorts/{id}/scores/{categoryId}
       → score-service.bulkUpdateScores(cohortId, categoryId, batch, version)
         → writeWithLock: 버전 체크 1회 → 전체 머지 → version++
@@ -945,12 +949,24 @@ ScoreTable.handlePaste
               → useEffect([value]) → localValue 동기화 → 입력란 UI 반영
 ```
 
-**입력란 동기화**: `ScoreInput`은 로컬 편집을 위해 `localValue` state를 사용하므로, 외부에서 `value` prop이 변경되었을 때 `useEffect`로 `localValue`를 동기화해야 입력란에 새 값이 표시된다.
+**데이터 흐름 (수정/override 칼럼):**
+```
+DataTable.handleOverridePaste
+  → 클립보드 파싱 → { [studentId]: number|null } 배치 객체 수집
+  → onBulkOverrideChange(batch) 호출
+    → eval page: 단일 PUT /api/cohorts/{id}/scores/{categoryId} { overrides: batch }
+      → score-service.bulkUpdateScores(cohortId, categoryId, null, version, overrides)
+        → scores.json의 overrides 섹션에 저장 (null이면 해당 항목 삭제)
+          → 성공 → refreshCalculation() → fetchScores()
+            → scores state 갱신 → OverrideInput의 value prop 변경 → UI 반영
+```
+
+**입력란 동기화**: `ScoreInput`/`OverrideInput`은 로컬 편집을 위해 `localValue` state를 사용하므로, 외부에서 `value` prop이 변경되었을 때 `useEffect`로 `localValue`를 동기화해야 입력란에 새 값이 표시된다.
 
 **사용 예시:**
 ```
 엑셀에서 A1:A5 (5명의 점수 칼럼) 복사
-→ ScoreTable 첫 번째 학생의 해당 필드 셀 클릭
+→ DataTable 첫 번째 학생의 해당 필드 셀 클릭
 → Ctrl+V
 → 5명의 점수가 단일 요청으로 서버에 저장
 ```
@@ -971,7 +987,7 @@ ScoreTable.handlePaste
 
 #### Number Input 스피너 숨김 및 편집 개선
 
-- ScoreTable 입력란: `type="number"` 유지 + `globals.css`에서 스피너 전역 숨김 (화살표 키는 셀 이동으로 사용)
+- DataTable 입력란: `type="number"` 유지 + `globals.css`에서 스피너 전역 숨김 (화살표 키는 셀 이동으로 사용)
 - 설정 입력란 (InlineSettings, FieldManager, 대시보드): `type="text" inputMode="numeric"`으로 변경하여 스피너 원천 제거 + 0 삭제 가능
   - `numVal()` 헬퍼: 입력 중 빈 문자열 허용, 저장 시 `toNum()`으로 숫자 변환
 

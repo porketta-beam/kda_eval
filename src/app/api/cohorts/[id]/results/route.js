@@ -19,8 +19,9 @@ export async function GET(request, { params }) {
 
     if (!config) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
+    const overrides = scoresData.overrides || {};
     const calculator = mode === 'projected' ? calculateProjectedScores : calculateTotals;
-    const results = calculator(config, scoresData.raw_scores, studentsData.students);
+    const results = calculator(config, scoresData.raw_scores, studentsData.students, overrides);
 
     return NextResponse.json({
       config,

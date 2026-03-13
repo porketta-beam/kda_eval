@@ -5,8 +5,8 @@ import { bulkUpdateScores } from '@/lib/services/score-service';
 export async function PUT(request, { params }) {
   const { id, categoryId } = await params;
   try {
-    const { scores, expectedVersion } = await request.json();
-    const saved = await bulkUpdateScores(id, categoryId, scores, expectedVersion);
+    const { scores, expectedVersion, overrides } = await request.json();
+    const saved = await bulkUpdateScores(id, categoryId, scores, expectedVersion, overrides);
 
     global.__io?.to(`cohort:${id}`).emit('data-changed', {
       type: 'scores',

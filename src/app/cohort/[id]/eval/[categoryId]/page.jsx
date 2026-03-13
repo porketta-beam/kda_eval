@@ -3,13 +3,11 @@
 import { use, useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCohortDataContext } from '@/hooks/CohortDataContext';
-import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { SCORING_METHOD } from '@/lib/schema';
 import InlineSettings from '@/components/eval/InlineSettings';
-import ScoreTable from '@/components/eval/ScoreTable';
-import SummaryTable from '@/components/eval/SummaryTable';
+import DataTable from '@/components/eval/DataTable';
 import FieldManager from '@/components/eval/FieldManager';
 import SlidePanel from '@/components/layout/SlidePanel';
 import ConflictDialog from '@/components/common/ConflictDialog';
@@ -33,9 +31,6 @@ export default function EvalPage({ params }) {
     if (!config) return null;
     return findCategory(config.evaluation_categories, categoryId);
   }, [config, categoryId]);
-
-  // Calculate results for this category
-  const [calculatedResults, setCalculatedResults] = useState(null);
 
   // 최신 version을 ref로 추적 — useCallback 클로저의 stale version 문제 방지
   const versionRef = useRef(scores?.version);
@@ -104,7 +99,6 @@ export default function EvalPage({ params }) {
   const handleConflictKeepMine = useCallback(async () => {
     if (!pendingChange) return;
     setConflictOpen(false);
-    // 서버 최신 버전을 가져와서 재시도
     await fetchScores();
     const freshScores = await fetch(`/api/cohorts/${encodeURIComponent(cohortId)}/scores`).then(r => r.json());
     await saveScore(pendingChange.studentId, pendingChange.fieldId, pendingChange.value, freshScores.version);
@@ -129,10 +123,64 @@ export default function EvalPage({ params }) {
     await refreshCalculation();
   }, [cohortId, categoryId, fetchConfig, refreshCalculation]);
 
+  // Override 저장 (단일)
+  const handleOverrideChange = useCallback(async (studentId, value) => {
+    const enc = encodeURIComponent;
+    const res = await fetch(`/api/cohorts/${enc(cohortId)}/scores/${enc(categoryId)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        overrides: { [studentId]: value },
+        expectedVersion: versionRef.current,
+      }),
+    });
+    if (res.status === 409) {
+      setConflictOpen(true);
+      return;
+    }
+    await updateVersionFromResponse(res.clone());
+    await refreshCalculation();
+  }, [cohortId, categoryId, updateVersionFromResponse, refreshCalculation]);
+
+  // Override 일괄 저장 (엑셀 붙여넣기용) — 단일 PUT 요청
+  const handleBulkOverrideChange = useCallback(async (batch) => {
+    const enc = encodeURIComponent;
+    const res = await fetch(`/api/cohorts/${enc(cohortId)}/scores/${enc(categoryId)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        overrides: batch,
+        expectedVersion: versionRef.current,
+      }),
+    });
+    if (res.status === 409) {
+      setConflictOpen(true);
+      return;
+    }
+    await updateVersionFromResponse(res.clone());
+    await refreshCalculation();
+  }, [cohortId, categoryId, updateVersionFromResponse, refreshCalculation]);
+
+  // Weight 변경 → 설정 저장
+  const handleWeightChange = useCallback((colId, weight) => {
+    if (!category) return;
+    const inputFields = (category.input_fields || []).map(f =>
+      f.id === colId ? { ...f, weight } : f
+    );
+    const subCategories = (category.sub_categories || []).map(s =>
+      s.id === colId ? { ...s, weight } : s
+    );
+    handleSettingsSave({ ...category, input_fields: inputFields, sub_categories: subCategories });
+  }, [category, handleSettingsSave]);
+
   const handleSubCategoryClick = useCallback((sub) => {
-    setPanelStack([]);
-    setPanelCategory(sub);
-  }, []);
+    // sub는 column 객체일 수 있으므로 실제 카테고리 찾기
+    const subCat = (category?.sub_categories || []).find(s => s.id === sub.id);
+    if (subCat) {
+      setPanelStack([]);
+      setPanelCategory(subCat);
+    }
+  }, [category]);
 
   const handlePanelDrillDown = useCallback((sub) => {
     setPanelStack(prev => [...prev, panelCategory]);
@@ -155,43 +203,89 @@ export default function EvalPage({ params }) {
   }, [cohortId, router]);
 
   const isComposite = category?.scoring_method === SCORING_METHOD.COMPOSITE;
+  const inputFields = category?.input_fields || [];
   const subCategories = category?.sub_categories || [];
 
-  const compositeColumns = useMemo(() => {
-    if (!isComposite) return [];
-    return subCategories.map(sub => ({
-      id: sub.id,
-      name: sub.name,
-      maxScore: sub.max_score,
-      isBonus: sub.is_bonus,
-      isClickable: !!(sub.sub_categories?.length),
-    }));
-  }, [isComposite, subCategories]);
+  // DataTable columns: input_fields → type='input', sub_categories → type='computed'
+  const tableColumns = useMemo(() => {
+    const cols = [];
+    for (const field of inputFields) {
+      cols.push({
+        id: field.id,
+        name: field.name,
+        type: 'input',
+        fieldType: field.type || 'number',
+        min: field.min,
+        max: field.max,
+        weight: field.weight,
+      });
+    }
+    for (const sub of subCategories) {
+      cols.push({
+        id: sub.id,
+        name: sub.name,
+        type: 'computed',
+        maxScore: sub.max_score,
+        isBonus: sub.is_bonus,
+        clickable: true,
+        weight: sub.weight,
+      });
+    }
+    return cols;
+  }, [inputFields, subCategories]);
 
-  const compositeData = useMemo(() => {
-    if (!isComposite) return {};
+  // cellData: raw_scores + calculated sub_scores 병합
+  const cellData = useMemo(() => {
+    const rawScores = scores?.raw_scores?.[categoryId] || {};
     const calcResults = scores?.calculated?.[categoryId] || {};
     const allStudents = students?.students || [];
     const d = {};
     for (const student of allStudents) {
+      d[student.id] = { ...(rawScores[student.id] || {}) };
+      // sub_scores에서 computed 값 추가
       const result = calcResults[student.id];
-      const sScores = {};
-      for (const sub of subCategories) {
-        sScores[sub.id] = result?.sub_scores?.[sub.id]?.calculated ?? null;
+      if (result?.sub_scores) {
+        for (const sub of subCategories) {
+          d[student.id][sub.id] = result.sub_scores[sub.id]?.calculated ?? null;
+        }
       }
-      d[student.id] = {
-        scores: sScores,
-        total: result?.calculated ?? 0,
-        rank: null,
-      };
     }
     return d;
-  }, [isComposite, scores, categoryId, students, subCategories]);
+  }, [scores, categoryId, students, subCategories]);
 
-  const compositeStudents = useMemo(() => {
-    const all = students?.students || [];
-    return showDropout ? all : all.filter(s => !s.is_dropout);
-  }, [students, showDropout]);
+  // 결과 칼럼
+  const resultColumns = useMemo(() => {
+    const calcResults = scores?.calculated?.[categoryId] || {};
+    const cols = [];
+    if (category?.scoring_method === SCORING_METHOD.RANK_DIFFERENTIAL) {
+      cols.push({
+        id: 'rank',
+        label: '순위',
+        getValue: (sid) => calcResults[sid]?.rank ?? null,
+      });
+    }
+    // 점수 칼럼: override가 있으면 override 값 사용
+    const categoryOverrides = scores?.overrides?.[categoryId] || {};
+    cols.push({
+      id: 'score',
+      label: `점수${category?.max_score != null ? ` (${category.max_score})` : ''}`,
+      getValue: (sid) => {
+        const overrideVal = categoryOverrides[sid];
+        if (overrideVal != null) return overrideVal;
+        return calcResults[sid]?.calculated ?? null;
+      },
+    });
+    return cols;
+  }, [scores, categoryId, category]);
+
+  // showWeightRow: 칼럼이 있을 때만
+  const showWeightRow = tableColumns.length > 0 && !isComposite;
+
+  // overrides
+  const categoryOverrides = useMemo(() =>
+    scores?.overrides?.[categoryId] || {},
+    [scores, categoryId]
+  );
 
   if (loading || !category) {
     return <div className="p-6 text-muted-foreground">로딩 중...</div>;
@@ -220,34 +314,25 @@ export default function EvalPage({ params }) {
         <Label htmlFor="show-dropout-eval" className="text-sm">중도퇴소 인원 표시</Label>
       </div>
 
-      {/* Score Table */}
-      {isComposite ? (
-        <>
-          <SummaryTable
-            title={category.name}
-            students={compositeStudents}
-            columns={compositeColumns}
-            data={compositeData}
-            onColumnClick={handleSubCategoryClick}
-            showRank={false}
-          />
-          <FieldManager category={category} onSave={handleSettingsSave} />
-        </>
-      ) : (
-        <>
-          <ScoreTable
-            category={category}
-            students={students?.students || []}
-            scores={scores}
-            calculatedResults={scores?.calculated || {}}
-            showDropout={showDropout}
-            onScoreChange={handleScoreChange}
-            onBulkScoreChange={handleBulkScoreChange}
-            onSubCategoryClick={handleSubCategoryClick}
-          />
-          <FieldManager category={category} onSave={handleSettingsSave} />
-        </>
-      )}
+      {/* DataTable */}
+      <DataTable
+        title={category.name}
+        columns={tableColumns}
+        students={students?.students || []}
+        cellData={cellData}
+        showWeightRow={showWeightRow}
+        scoringMethod={category.scoring_method}
+        onWeightChange={handleWeightChange}
+        resultColumns={resultColumns}
+        onCellChange={handleScoreChange}
+        onBulkCellChange={handleBulkScoreChange}
+        onColumnClick={handleSubCategoryClick}
+        showDropout={showDropout}
+        overrides={categoryOverrides}
+        onOverrideChange={handleOverrideChange}
+        onBulkOverrideChange={handleBulkOverrideChange}
+      />
+      <FieldManager category={category} onSave={handleSettingsSave} />
 
       {/* Conflict Dialog */}
       <ConflictDialog

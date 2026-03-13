@@ -28,7 +28,7 @@ import {
 } from '@/components/ui/select';
 import { SCORING_METHOD, METHOD_LABELS } from '@/lib/schema';
 import CategoryCard from '@/components/eval/CategoryCard';
-import SummaryTable from '@/components/eval/SummaryTable';
+import DataTable from '@/components/eval/DataTable';
 
 export default function CohortDashboard({ params }) {
   const { id: cohortId } = use(params);
@@ -69,34 +69,38 @@ export default function CohortDashboard({ params }) {
     categories.map(cat => ({
       id: cat.id,
       name: cat.name,
+      type: 'computed',
       maxScore: cat.max_score,
       isBonus: cat.is_bonus,
-      isClickable: true,
+      clickable: true,
     })),
     [categories]
   );
 
-  const summaryData = useMemo(() => {
+  const summaryCellData = useMemo(() => {
     const totals = results?.results?.totals;
     if (!totals) return {};
     const allStudents = students?.students || [];
     const d = {};
     for (const student of allStudents) {
       const t = totals[student.id];
-      const scores = {};
+      d[student.id] = {};
       if (t?.breakdown) {
         for (const catId of Object.keys(t.breakdown)) {
-          scores[catId] = t.breakdown[catId]?.score ?? null;
+          d[student.id][catId] = t.breakdown[catId]?.score ?? null;
         }
       }
-      d[student.id] = {
-        scores,
-        total: t?.total ?? 0,
-        rank: t?.rank ?? null,
-      };
     }
     return d;
   }, [results, students]);
+
+  const summaryResultColumns = useMemo(() => {
+    const totals = results?.results?.totals;
+    return [
+      { id: 'total', label: '총점', getValue: (sid) => totals?.[sid]?.total ?? null },
+      { id: 'rank', label: '순위', getValue: (sid) => totals?.[sid]?.rank ?? null },
+    ];
+  }, [results]);
 
   const summaryStudents = showDropout
     ? (students?.students || [])
@@ -249,12 +253,14 @@ export default function CohortDashboard({ params }) {
       </div>
 
       {results?.results?.totals && (
-        <SummaryTable
+        <DataTable
           title="총점"
           students={summaryStudents}
           columns={summaryColumns}
-          data={summaryData}
+          cellData={summaryCellData}
+          resultColumns={summaryResultColumns}
           onColumnClick={(column) => router.push(`/cohort/${encodeURIComponent(cohortId)}/eval/${column.id}`)}
+          showDropout={showDropout}
         />
       )}
 

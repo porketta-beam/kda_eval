@@ -73,7 +73,8 @@ export const INPUT_SCOPE = {
  * @property {string} scoring_method  - SCORING_METHOD 값
  * @property {Object} config          - 방식별 세부 설정
  * @property {InputField[]} input_fields - 입력 필드 정의
- * @property {EvaluationCategory[]} [sub_categories] - 하위 항목 (복합 방식)
+ * @property {number} [weight]        - 가중치 (하위항목으로 사용 시, 기본 1)
+ * @property {EvaluationCategory[]} [sub_categories] - 하위 항목
  */
 
 /**
@@ -136,6 +137,7 @@ export const INPUT_SCOPE = {
  * @property {string} per             - INPUT_SCOPE 값
  * @property {number} [min]
  * @property {number} [max]
+ * @property {number} [weight]        - 가중치 (기본 1)
  * @property {Array<{label: string, value: *}>} [options]
  */
 
@@ -164,6 +166,8 @@ export const INPUT_SCOPE = {
  * @property {number} version
  * @property {Object<string, Object<string, Object<string, number|boolean|string>>>} raw_scores
  *   구조: { [category_id]: { [student_id]: { [field_id]: value } } }
+ * @property {Object<string, Object<string, number|null>>} [overrides]
+ *   구조: { [category_id]: { [student_id]: number|null } }
  */
 
 // ─── 팩토리 함수 ────────────────────────────────────────────
@@ -202,7 +206,7 @@ export function createCategory(name, scoringMethod, maxScore, options = {}) {
     scoring_method: scoringMethod,
     config: options.config ?? {},
     input_fields: options.input_fields ?? [],
-    ...(scoringMethod === SCORING_METHOD.COMPOSITE ? { sub_categories: options.sub_categories ?? [] } : {}),
+    sub_categories: options.sub_categories ?? [],
   };
 }
 

@@ -138,6 +138,14 @@ function LeafManager({ category, onSave, open, setOpen }) {
                 />
               </>
             )}
+            <Label className="text-xs text-muted-foreground ml-1">가중치</Label>
+            <Input
+              type="text"
+              inputMode="numeric"
+              value={field.weight ?? 1}
+              onChange={e => handleFieldChange(field.id, 'weight', e.target.value === '' ? 1 : Number(e.target.value))}
+              className="h-7 w-14 text-sm"
+            />
             <div className="flex items-center gap-0.5 ml-auto">
               {idx > 0 && (
                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground" onClick={() => handleMove(idx, -1)}>
@@ -254,6 +262,14 @@ function CompositeManager({ category, onSave, open, setOpen }) {
                 ))}
               </SelectContent>
             </Select>
+            <Label className="text-xs text-muted-foreground ml-1">가중치</Label>
+            <Input
+              type="text"
+              inputMode="numeric"
+              value={sub.weight ?? 1}
+              onChange={e => handleSubChange(sub.id, 'weight', e.target.value === '' ? 1 : Number(e.target.value))}
+              className="h-7 w-14 text-sm"
+            />
             <div className="flex items-center gap-0.5 ml-auto">
               {idx > 0 && (
                 <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground" onClick={() => handleMove(idx, -1)}>

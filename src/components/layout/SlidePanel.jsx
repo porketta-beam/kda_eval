@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useMemo } from 'react';
 import {
   Sheet,
   SheetContent,
@@ -15,7 +15,8 @@ import {
   BreadcrumbList,
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
-import ScoreTable from '@/components/eval/ScoreTable';
+import { SCORING_METHOD } from '@/lib/schema';
+import DataTable from '@/components/eval/DataTable';
 import InlineSettings from '@/components/eval/InlineSettings';
 
 export default function SlidePanel({
@@ -37,11 +38,82 @@ export default function SlidePanel({
   const breadcrumbItems = [...panelStack, category];
 
   const handleBreadcrumbClick = (index) => {
-    // Navigate back to that level
     const stepsBack = breadcrumbItems.length - 1 - index;
     for (let i = 0; i < stepsBack; i++) {
       onBack();
     }
+  };
+
+  const inputFields = category.input_fields || [];
+  const subCategories = category.sub_categories || [];
+
+  // DataTable columns
+  const tableColumns = useMemo(() => {
+    const cols = [];
+    for (const field of inputFields) {
+      cols.push({
+        id: field.id,
+        name: field.name,
+        type: 'input',
+        fieldType: field.type || 'number',
+        min: field.min,
+        max: field.max,
+        weight: field.weight,
+      });
+    }
+    for (const sub of subCategories) {
+      cols.push({
+        id: sub.id,
+        name: sub.name,
+        type: 'computed',
+        maxScore: sub.max_score,
+        isBonus: sub.is_bonus,
+        clickable: true,
+        weight: sub.weight,
+      });
+    }
+    return cols;
+  }, [inputFields, subCategories]);
+
+  // cellData
+  const cellData = useMemo(() => {
+    const rawScores = scores?.raw_scores?.[category.id] || {};
+    const calcResults = scores?.calculated?.[category.id] || {};
+    const d = {};
+    for (const student of students) {
+      d[student.id] = { ...(rawScores[student.id] || {}) };
+      const result = calcResults[student.id];
+      if (result?.sub_scores) {
+        for (const sub of subCategories) {
+          d[student.id][sub.id] = result.sub_scores[sub.id]?.calculated ?? null;
+        }
+      }
+    }
+    return d;
+  }, [scores, category.id, students, subCategories]);
+
+  // result columns
+  const resultColumns = useMemo(() => {
+    const calcResults = scores?.calculated?.[category.id] || {};
+    const cols = [];
+    if (category.scoring_method === SCORING_METHOD.RANK_DIFFERENTIAL) {
+      cols.push({
+        id: 'rank',
+        label: '순위',
+        getValue: (sid) => calcResults[sid]?.rank ?? null,
+      });
+    }
+    cols.push({
+      id: 'score',
+      label: '점수',
+      getValue: (sid) => calcResults[sid]?.calculated ?? null,
+    });
+    return cols;
+  }, [scores, category]);
+
+  const handleColumnClick = (col) => {
+    const subCat = subCategories.find(s => s.id === col.id);
+    if (subCat) onDrillDown?.(subCat);
   };
 
   return (
@@ -103,17 +175,17 @@ export default function SlidePanel({
             }}
           />
 
-          <ScoreTable
-            category={category}
+          <DataTable
+            columns={tableColumns}
             students={students}
-            scores={scores}
-            calculatedResults={scores?.calculated || {}}
-            showDropout={showDropout}
-            onScoreChange={(studentId, fieldId, value) => {
-              onScoreChange?.(studentId, fieldId, value);
+            cellData={cellData}
+            resultColumns={resultColumns}
+            onCellChange={(studentId, colId, value) => {
+              onScoreChange?.(studentId, colId, value);
             }}
-            onBulkScoreChange={onBulkScoreChange}
-            onSubCategoryClick={onDrillDown}
+            onBulkCellChange={onBulkScoreChange}
+            onColumnClick={handleColumnClick}
+            showDropout={showDropout}
           />
         </div>
       </SheetContent>
