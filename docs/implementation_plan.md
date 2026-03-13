@@ -975,6 +975,13 @@ ScoreTable.handlePaste
 - 설정 입력란 (InlineSettings, FieldManager, 대시보드): `type="text" inputMode="numeric"`으로 변경하여 스피너 원천 제거 + 0 삭제 가능
   - `numVal()` 헬퍼: 입력 중 빈 문자열 허용, 저장 시 `toNum()`으로 숫자 변환
 
+#### 평가 방식 한글 라벨
+
+`schema.js`에 `METHOD_LABELS` 상수를 정의하여 `SCORING_METHOD` 값을 한글로 매핑. Select 드롭다운에서 영문 enum 키 대신 한글 라벨을 표시한다.
+
+- **공유 상수**: `src/lib/schema.js`의 `METHOD_LABELS` (CategoryCard, InlineSettings, FieldManager, 대시보드에서 공통 사용)
+- **적용 위치**: InlineSettings 방식 Select, FieldManager CompositeManager 방식 Select, 대시보드 평가항목 추가 다이얼로그
+
 ---
 
 ## 9. 테스트 전략

@@ -2,18 +2,7 @@
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { SCORING_METHOD } from '@/lib/schema';
-
-const METHOD_LABELS = {
-  [SCORING_METHOD.WEIGHTED_AVERAGE]: '가중평균',
-  [SCORING_METHOD.SUM_DIVIDE]: '합산',
-  [SCORING_METHOD.RANK_DIFFERENTIAL]: '순위',
-  [SCORING_METHOD.FORMULA]: '공식',
-  [SCORING_METHOD.BOOLEAN]: 'Boolean',
-  [SCORING_METHOD.BOOLEAN_WITH_DEDUCTION]: '차감법',
-  [SCORING_METHOD.USER_INPUT]: '수동입력',
-  [SCORING_METHOD.COMPOSITE]: '복합',
-};
+import { SCORING_METHOD, METHOD_LABELS } from '@/lib/schema';
 
 export default function CategoryCard({ category, scores, students, onClick, onDelete, onMoveUp, onMoveDown }) {
   const methodLabel = METHOD_LABELS[category.scoring_method] || category.scoring_method;

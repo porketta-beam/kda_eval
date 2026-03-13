@@ -19,6 +19,18 @@ export const SCORING_METHOD = {
   COMPOSITE: 'composite',
 };
 
+/** 평가 방식 한글 라벨 */
+export const METHOD_LABELS = {
+  [SCORING_METHOD.WEIGHTED_AVERAGE]: '가중평균',
+  [SCORING_METHOD.SUM_DIVIDE]: '합산',
+  [SCORING_METHOD.RANK_DIFFERENTIAL]: '순위',
+  [SCORING_METHOD.FORMULA]: '공식',
+  [SCORING_METHOD.BOOLEAN]: 'Boolean',
+  [SCORING_METHOD.BOOLEAN_WITH_DEDUCTION]: '차감법',
+  [SCORING_METHOD.USER_INPUT]: '수동입력',
+  [SCORING_METHOD.COMPOSITE]: '복합',
+};
+
 export const INPUT_FIELD_TYPE = {
   NUMBER: 'number',
   TEXT: 'text',

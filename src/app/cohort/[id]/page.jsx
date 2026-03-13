@@ -26,7 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { SCORING_METHOD } from '@/lib/schema';
+import { SCORING_METHOD, METHOD_LABELS } from '@/lib/schema';
 import CategoryCard from '@/components/eval/CategoryCard';
 import SummaryTable from '@/components/eval/SummaryTable';
 
@@ -316,7 +316,7 @@ export default function CohortDashboard({ params }) {
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {Object.entries(SCORING_METHOD).map(([key, val]) => (
-                    <SelectItem key={val} value={val}>{key}</SelectItem>
+                    <SelectItem key={val} value={val}>{METHOD_LABELS[val] || key}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

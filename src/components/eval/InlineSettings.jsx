@@ -17,7 +17,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-import { SCORING_METHOD } from '@/lib/schema';
+import { SCORING_METHOD, METHOD_LABELS } from '@/lib/schema';
 
 // 빈 문자열 허용 number 변환 (입력 중 0 삭제 가능)
 const numVal = (v) => v === '' ? '' : Number(v);
@@ -80,7 +80,7 @@ export default function InlineSettings({ category, onSave }) {
               <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {Object.entries(SCORING_METHOD).map(([key, val]) => (
-                  <SelectItem key={val} value={val}>{key}</SelectItem>
+                  <SelectItem key={val} value={val}>{METHOD_LABELS[val] || key}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

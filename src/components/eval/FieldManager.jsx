@@ -17,7 +17,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-import { SCORING_METHOD, INPUT_FIELD_TYPE } from '@/lib/schema';
+import { SCORING_METHOD, METHOD_LABELS, INPUT_FIELD_TYPE } from '@/lib/schema';
 
 export default function FieldManager({ category, onSave }) {
   const [open, setOpen] = useState(false);
@@ -250,7 +250,7 @@ function CompositeManager({ category, onSave, open, setOpen }) {
               </SelectTrigger>
               <SelectContent>
                 {Object.entries(SCORING_METHOD).map(([key, val]) => (
-                  <SelectItem key={val} value={val}>{key}</SelectItem>
+                  <SelectItem key={val} value={val}>{METHOD_LABELS[val] || key}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
