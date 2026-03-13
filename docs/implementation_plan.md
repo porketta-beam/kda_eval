@@ -918,6 +918,20 @@ pm2 start npm --name "kda-eval" -- start -- -p 80
 
 `bulkUpdateScores` 서비스가 이미 다중 학생 형식을 지원하므로 API 변경 불필요.
 
+**연속 요청 시 version 동기화 (versionRef 패턴)**:
+
+배치 요청 후 `refreshCalculation()` → `fetchScores()`로 state가 갱신되지만, React의 state 업데이트는 비동기적이라 `useCallback` 클로저 안의 `scores?.version`은 이전 렌더 사이클의 값을 유지한다 (stale closure). 따라서 연속으로 두 번째 칼럼을 붙여넣기하면 이전 version으로 요청하여 409가 발생.
+
+**해결**: `versionRef`(useRef)로 최신 version을 추적:
+1. `useEffect([scores?.version])`로 state 변경 시 ref 갱신
+2. PUT 응답의 `saved.version`을 `res.json()`으로 읽어 즉시 `versionRef.current` 갱신
+3. 모든 PUT 요청에서 `scores?.version` 대신 `versionRef.current` 사용
+
+```
+1번째 붙여넣기: versionRef=1 → PUT → 성공 → 응답 version=2 → versionRef=2
+2번째 붙여넣기: versionRef=2 → PUT → 성공 → 응답 version=3 → versionRef=3
+```
+
 **데이터 흐름:**
 ```
 ScoreTable.handlePaste

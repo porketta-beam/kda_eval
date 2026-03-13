@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useState, useCallback, useMemo } from 'react';
+import { use, useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCohortDataContext } from '@/hooks/CohortDataContext';
 import { Button } from '@/components/ui/button';
@@ -37,10 +37,26 @@ export default function EvalPage({ params }) {
   // Calculate results for this category
   const [calculatedResults, setCalculatedResults] = useState(null);
 
+  // 최신 version을 ref로 추적 — useCallback 클로저의 stale version 문제 방지
+  const versionRef = useRef(scores?.version);
+  useEffect(() => {
+    versionRef.current = scores?.version;
+  }, [scores?.version]);
+
   // Fetch calculated scores when category changes
   const refreshCalculation = useCallback(async () => {
     await fetchScores();
   }, [fetchScores]);
+
+  // PUT 후 응답에서 새 version을 즉시 반영
+  const updateVersionFromResponse = useCallback(async (res) => {
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.version != null) {
+        versionRef.current = data.version;
+      }
+    }
+  }, []);
 
   const saveScore = useCallback(async (studentId, fieldId, value, version) => {
     const enc = encodeURIComponent;
@@ -56,14 +72,15 @@ export default function EvalPage({ params }) {
   }, [cohortId, categoryId]);
 
   const handleScoreChange = useCallback(async (studentId, fieldId, value) => {
-    const res = await saveScore(studentId, fieldId, value, scores?.version);
+    const res = await saveScore(studentId, fieldId, value, versionRef.current);
     if (res.status === 409) {
       setPendingChange({ studentId, fieldId, value });
       setConflictOpen(true);
       return;
     }
+    await updateVersionFromResponse(res.clone());
     await refreshCalculation();
-  }, [scores?.version, saveScore, refreshCalculation]);
+  }, [saveScore, updateVersionFromResponse, refreshCalculation]);
 
   // 배치 점수 저장 (엑셀 붙여넣기용) — 단일 PUT 요청
   const handleBulkScoreChange = useCallback(async (batchScores) => {
@@ -73,15 +90,16 @@ export default function EvalPage({ params }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         scores: batchScores,
-        expectedVersion: scores?.version,
+        expectedVersion: versionRef.current,
       }),
     });
     if (res.status === 409) {
       setConflictOpen(true);
       return;
     }
+    await updateVersionFromResponse(res.clone());
     await refreshCalculation();
-  }, [cohortId, categoryId, scores?.version, refreshCalculation]);
+  }, [cohortId, categoryId, updateVersionFromResponse, refreshCalculation]);
 
   const handleConflictKeepMine = useCallback(async () => {
     if (!pendingChange) return;
