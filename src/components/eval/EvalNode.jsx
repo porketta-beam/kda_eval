@@ -171,18 +171,31 @@ export default function EvalNode({ cohortId, path }) {
     const totals = results?.results?.totals;
     if (!totals) return {};
     const allStudents = students?.students || [];
+    const calcResults = scores?.calculated || {};
     const d = {};
     for (const student of allStudents) {
       const t = totals[student.id];
       d[student.id] = {};
       if (t?.breakdown) {
         for (const catId of Object.keys(t.breakdown)) {
-          d[student.id][catId] = t.breakdown[catId]?.score ?? null;
+          const catCalc = calcResults[catId]?.[student.id];
+          // raw === null 이면 미입력 상태 → null 표시
+          const scoreValue = (!catCalc || catCalc.raw === null) ? null : (t.breakdown[catId]?.score ?? null);
+          d[student.id][catId] = scoreValue;
+        }
+      }
+      // 카테고리별 오류 포함
+      for (const catId of Object.keys(calcResults)) {
+        const cat = (config?.evaluation_categories || []).find(c => c.id === catId);
+        const hasFormulaError = cat?.scoring_method === SCORING_METHOD.COMPOSITE && !cat?.config?.final_formula?.trim();
+        const catResult = calcResults[catId]?.[student.id];
+        if (hasFormulaError || catResult?.error) {
+          d[student.id][`_err_${catId}`] = catResult?.error || 'formula_missing';
         }
       }
     }
     return d;
-  }, [isRoot, results, students]);
+  }, [isRoot, results, students, scores, config]);
 
   // ── NON-ROOT columns & cell data ──────────────────────────────────────────
   const inputFields = category?.input_fields || [];
@@ -238,6 +251,31 @@ export default function EvalNode({ cohortId, path }) {
   }
 
   const enc = encodeURIComponent;
+
+  // 빈 상태 온보딩 (루트 페이지에서만)
+  if (isRoot) {
+    const hasStudents = (students?.students?.length ?? 0) > 0;
+    const hasCategories = sortedCategories.length > 0;
+
+    if (!hasStudents) {
+      return (
+        <div className="p-8 text-center text-muted-foreground">
+          <p className="mb-2">학생이 없습니다. 먼저 학생을 추가해야 평가를 시작할 수 있습니다.</p>
+          <Link href={`/cohort/${enc(cohortId)}/students`} className="text-primary underline">
+            학생 관리로 이동 →
+          </Link>
+        </div>
+      );
+    }
+
+    if (!hasCategories) {
+      return (
+        <div className="p-8 text-center text-muted-foreground">
+          <p>평가 항목이 없습니다. 항목을 추가하세요.</p>
+        </div>
+      );
+    }
+  }
 
   return (
     <div className="p-6">

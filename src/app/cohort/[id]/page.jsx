@@ -44,6 +44,7 @@ export default function CohortDashboard({ params }) {
   const [newCatMethod, setNewCatMethod] = useState(SCORING_METHOD.USER_INPUT);
   const [newCatMax, setNewCatMax] = useState('10');
   const [newCatBonus, setNewCatBonus] = useState(false);
+  const [newCatFormula, setNewCatFormula] = useState('');
 
   // 집계 설정 state
   const aggSettings = config?.aggregation_settings || {};
@@ -121,12 +122,14 @@ export default function CohortDashboard({ params }) {
         scoring_method: newCatMethod,
         max_score: Number(newCatMax) || 0,
         is_bonus: newCatBonus,
+        config: newCatMethod === SCORING_METHOD.COMPOSITE ? { final_formula: newCatFormula } : {},
       }),
     });
     setAddDialogOpen(false);
     setNewCatName('');
     setNewCatMax('10');
     setNewCatBonus(false);
+    setNewCatFormula('');
     await fetchConfig();
     await fetchScores();
   };
@@ -335,6 +338,16 @@ export default function CohortDashboard({ params }) {
                 </SelectContent>
               </Select>
             </div>
+            {newCatMethod === SCORING_METHOD.COMPOSITE && (
+              <div>
+                <Label>최종 공식 (선택)</Label>
+                <Input
+                  placeholder="예: _cat0 + _cat1"
+                  value={newCatFormula}
+                  onChange={e => setNewCatFormula(e.target.value)}
+                />
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <Checkbox id="bonus" checked={newCatBonus} onCheckedChange={setNewCatBonus} />
               <Label htmlFor="bonus">가산점 항목</Label>

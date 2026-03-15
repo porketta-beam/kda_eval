@@ -201,7 +201,8 @@ export default function DataTable({
 
   const clickableClass = 'text-blue-600 hover:underline cursor-pointer';
 
-  const formatValue = (v) => {
+  const formatValue = (v, error) => {
+    if (error) return '⚠';
     if (v == null) return '-';
     if (typeof v === 'number') return v.toFixed(1);
     return v;
@@ -276,14 +277,16 @@ export default function DataTable({
                   }
                   // computed
                   const value = studentData[col.id];
+                  const cellError = studentData[`_err_${col.id}`] ?? null;
                   return (
                     <TableCell key={col.id} className="text-center">
                       {col.clickable ? (
                         <button
+                          data-cell-state={cellError ? 'error' : value == null ? 'empty' : 'ok'}
                           className={clickableClass}
                           onClick={() => onColumnClick?.(col)}
                         >
-                          ▶ {formatValue(value)}
+                          ▶ {formatValue(value, cellError)}
                         </button>
                       ) : (
                         formatValue(value)
