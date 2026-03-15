@@ -9,7 +9,12 @@
     "build": "next build",
     "start": "cross-env NODE_ENV=production node server.js",
     "lint": "eslint",
-    "test:scoring": "node --import ./tests/register-loader.js tests/scoring-engine.test.js"
+    "test:scoring":  "node --import ./tests/register-loader.js tests/scoring-engine.test.js",
+    "test:team":     "node --import ./tests/register-loader.js tests/team-scoring.test.js",
+    "test:unit":     "npm run test:scoring && npm run test:team",
+    "test:e2e":      "npx playwright test",
+    "test:e2e:team": "npx playwright test tests/e2e/team-input.spec.js",
+    "test:e2e:nav":  "npx playwright test tests/e2e/recursive-nav.spec.js"
   },
   "dependencies": {
     "async-mutex": "^0.5.0",
