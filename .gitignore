@@ -41,6 +41,15 @@ yarn-error.log*
 # vercel
 .vercel
 
+# playwright mcp logs
+/.playwright-mcp/
+
+# ralph loop local state
+.claude/ralph-loop.local.md
+
+# claude local settings
+.claude/settings.local.json
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
