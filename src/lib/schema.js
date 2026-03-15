@@ -81,6 +81,7 @@ export const COLUMN_TYPE = {
  * @property {InputField[]} input_fields - 입력 필드 정의
  * @property {number} [weight]        - 가중치 (하위항목으로 사용 시, 기본 1)
  * @property {EvaluationCategory[]} [sub_categories] - 하위 항목
+ * @property {string} [input_scope] - 'student'(기본) | 'team'
  */
 
 /**
@@ -213,6 +214,7 @@ export function createCategory(name, scoringMethod, maxScore, options = {}) {
     config: options.config ?? {},
     input_fields: options.input_fields ?? [],
     sub_categories: options.sub_categories ?? [],
+    input_scope: options.input_scope ?? 'student',
   };
 }
 

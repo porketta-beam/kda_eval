@@ -55,6 +55,34 @@ function buildAugmentedScores(categoryScores, subResults, subCategories, student
 }
 
 /**
+ * 팀 입력 모드 계산: 팀 단위로 계산 후 팀원 학생에게 배분
+ */
+function calculateTeamCategory(category, allRawScores, students, teams, method) {
+  const teamScores = allRawScores[category.id] || {};
+
+  // 팀별 계산
+  const teamResultMap = {};
+  for (const team of teams) {
+    const singleEntityScores = { [team.id]: teamScores[team.id] || {} };
+    const result = method.calculate(
+      category,
+      singleEntityScores,
+      [{ id: team.id, name: team.name, is_dropout: false }],
+      []
+    );
+    teamResultMap[team.id] = result[team.id] ?? { raw: null, calculated: 0 };
+  }
+
+  // 팀 점수를 학생에게 배분
+  const studentResults = {};
+  for (const student of students) {
+    const teamId = student.team_id;
+    studentResults[student.id] = teamResultMap[teamId] ?? { raw: null, calculated: 0 };
+  }
+  return studentResults;
+}
+
+/**
  * 단일 카테고리 계산
  * @param {import('@/lib/schema').EvaluationCategory} category
  * @param {Object} allRawScores - scores.json의 raw_scores 전체
@@ -70,6 +98,11 @@ export function calculateCategory(category, allRawScores, students, teams = []) 
 
   // 활성 학생만 계산 (중도퇴소 제외)
   const activeStudents = students.filter(s => !s.is_dropout);
+
+  // ★ 팀 입력 모드: composite보다 먼저 분기
+  if (category.input_scope === 'team') {
+    return calculateTeamCategory(category, allRawScores, activeStudents, teams, method);
+  }
 
   // composite는 하위 카테고리 접근을 위해 전체 rawScores 필요
   if (category.scoring_method === SCORING_METHOD.COMPOSITE) {
