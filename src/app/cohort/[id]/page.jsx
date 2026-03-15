@@ -26,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { SCORING_METHOD, METHOD_LABELS, COLUMN_TYPE } from '@/lib/schema';
 import CategoryCard from '@/components/eval/CategoryCard';
 import DataTable from '@/components/eval/DataTable';
@@ -191,6 +192,13 @@ export default function CohortDashboard({ params }) {
 
   return (
     <div className="p-6 max-w-4xl">
+      {config?.name && (
+        <Card className="mb-4">
+          <CardHeader className="py-3">
+            <CardTitle className="text-lg">{config.name}</CardTitle>
+          </CardHeader>
+        </Card>
+      )}
       <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen}>
         <div className="flex items-center gap-2 mb-4">
           <CollapsibleTrigger asChild>

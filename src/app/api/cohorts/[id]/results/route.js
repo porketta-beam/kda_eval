@@ -19,9 +19,21 @@ export async function GET(request, { params }) {
 
     if (!config) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
+    // 학생에 team_id 설정 (config.teams[].members 기반)
+    const studentTeamMap = {};
+    for (const team of (config.teams || [])) {
+      for (const memberId of (team.members || [])) {
+        studentTeamMap[memberId] = team.id;
+      }
+    }
+    const studentsWithTeam = studentsData.students.map(s => ({
+      ...s,
+      team_id: studentTeamMap[s.id] ?? null,
+    }));
+
     const overrides = scoresData.overrides || {};
     const calculator = mode === 'projected' ? calculateProjectedScores : calculateTotals;
-    const results = calculator(config, scoresData.raw_scores, studentsData.students, overrides);
+    const results = calculator(config, scoresData.raw_scores, studentsWithTeam, overrides);
 
     return NextResponse.json({
       config,

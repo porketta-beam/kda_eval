@@ -16,7 +16,20 @@ export async function GET(request, { params }) {
     if (calculated) {
       const config = await getConfig(id);
       const studentsData = await getStudents(id);
-      const results = calculateAllCategories(config, scores.raw_scores, studentsData.students);
+
+      // 학생에 team_id 설정 (config.teams[].members 기반)
+      const studentTeamMap = {};
+      for (const team of (config.teams || [])) {
+        for (const memberId of (team.members || [])) {
+          studentTeamMap[memberId] = team.id;
+        }
+      }
+      const studentsWithTeam = studentsData.students.map(s => ({
+        ...s,
+        team_id: studentTeamMap[s.id] ?? null,
+      }));
+
+      const results = calculateAllCategories(config, scores.raw_scores, studentsWithTeam);
       return NextResponse.json({ ...scores, calculated: results });
     }
 

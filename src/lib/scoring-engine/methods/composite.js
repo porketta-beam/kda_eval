@@ -29,7 +29,9 @@ export function calculate(category, rawScores, students, teams = []) {
   }
 
   // 수식에서 rawName → safeVar 치환 (한글은 직접, ASCII는 단어 경계 사용)
-  let safeFormula = final_formula;
+  // formula 없으면 모든 sub-category 합산으로 fallback
+  let safeFormula = final_formula?.trim()
+    || (subCategories.length > 0 ? subCategories.map((_, i) => `_cat${i}`).join(' + ') : '0');
   for (const [rawName, safeVar] of Object.entries(safeVarMap)) {
     const isAscii = /^[a-zA-Z0-9_]+$/.test(rawName);
     const pattern = isAscii

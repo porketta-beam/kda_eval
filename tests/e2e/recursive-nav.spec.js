@@ -50,7 +50,7 @@ test.beforeAll(async ({ request }) => {
     },
   });
   const leafCat = await leafRes.json();
-  leafCatId = leafCat.id;
+  leafCatId = leafCat.category?.id ?? leafCat.id;
 
   // Composite 카테고리 생성
   const compRes = await request.post(`/api/cohorts/${cohortId}/config/categories`, {
@@ -62,7 +62,7 @@ test.beforeAll(async ({ request }) => {
     },
   });
   const compCat = await compRes.json();
-  compositeCatId = compCat.id;
+  compositeCatId = compCat.category?.id ?? compCat.id;
 
   // Sub-category 추가 (composite 하위)
   const config = await (await request.get(`/api/cohorts/${cohortId}/config`)).json();
@@ -123,7 +123,7 @@ test.describe.serial('EvalNode 재귀 네비게이션', () => {
     await expect(page.getByRole('cell', { name: '테스트학생1' })).toBeVisible();
 
     // INPUT 타입 칼럼 (number input) 있어야 함
-    await expect(page.locator('table input')).toBeVisible();
+    await expect(page.locator('table input').first()).toBeVisible();
   });
 
   test('3. /eval/[catId] — Composite: COMPUTED 칼럼으로 sub_categories 표시', async ({ page }) => {
@@ -135,8 +135,8 @@ test.describe.serial('EvalNode 재귀 네비게이션', () => {
     // sub_category 이름이 COMPUTED 칼럼 헤더로 표시됨
     await expect(page.getByText('팀 평가')).toBeVisible();
 
-    // 직접 INPUT 가능한 칼럼은 없어야 함 (composite 자체에 input_fields 없음)
-    const inputs = page.locator('table input[type="number"]');
+    // 직접 INPUT 가능한 칼럼은 없어야 함 (composite 자체에 input_fields 없음, override 제외)
+    const inputs = page.locator('table input[type="number"]:not([data-override-row])');
     await expect(inputs).toHaveCount(0);
   });
 
@@ -170,7 +170,7 @@ test.describe.serial('EvalNode 재귀 네비게이션', () => {
     await expect(page.locator('table')).toBeVisible();
 
     // Sub 카테고리 이름이 페이지 어딘가에 표시됨
-    await expect(page.getByText('팀 평가')).toBeVisible();
+    await expect(page.getByText('팀 평가').first()).toBeVisible();
   });
 
   test('6. Breadcrumb이 현재 depth를 표현함', async ({ page }) => {
@@ -208,7 +208,7 @@ test.describe.serial('EvalNode 재귀 네비게이션', () => {
     await page.goto(`/cohort/${cohortId}/eval/${leafCatId}`);
     await page.waitForLoadState('networkidle');
 
-    const firstInput = page.locator('table input[type="number"]').first();
+    const firstInput = page.locator('table input[data-row="0"]').first();
     await firstInput.fill('8');
 
     const [response] = await Promise.all([

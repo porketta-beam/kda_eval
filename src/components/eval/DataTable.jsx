@@ -48,6 +48,7 @@ import { SCORING_METHOD, COLUMN_TYPE } from '@/lib/schema';
 export default function DataTable({
   title,
   columns = [],
+  rows = null,
   students = [],
   cellData = {},
   showWeightRow = false,
@@ -66,10 +67,11 @@ export default function DataTable({
   const [sortAsc, setSortAsc] = useState(true);
   const tableRef = useRef(null);
 
-  const activeStudents = useMemo(
-    () => showDropout ? students : students.filter(s => !s.is_dropout),
-    [students, showDropout]
-  );
+  // rows prop이 있으면 그대로 사용 (팀 모드), 없으면 students에서 dropout 필터링
+  const activeRows = useMemo(() => {
+    if (rows) return rows;
+    return showDropout ? students : students.filter(s => !s.is_dropout);
+  }, [rows, students, showDropout]);
 
   const handleSort = (key) => {
     if (sortKey === key) setSortAsc(!sortAsc);
@@ -88,8 +90,8 @@ export default function DataTable({
     return map;
   }, [inputColumns]);
 
-  const sortedStudents = useMemo(() => {
-    return [...activeStudents].sort((a, b) => {
+  const sortedRows = useMemo(() => {
+    return [...activeRows].sort((a, b) => {
       let va, vb;
       if (sortKey === 'name') {
         return sortAsc ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
@@ -110,7 +112,7 @@ export default function DataTable({
       }
       return sortAsc ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va));
     });
-  }, [activeStudents, sortKey, sortAsc, resultColumns, overrides, cellData]);
+  }, [activeRows, sortKey, sortAsc, resultColumns, overrides, cellData]);
 
   // 셀 이동 (키보드 네비)
   const focusCell = useCallback((currentRow, currentCol, dRow, dCol) => {
@@ -143,8 +145,8 @@ export default function DataTable({
     const batch = {};
     for (let r = 0; r < parsed.length; r++) {
       const studentIdx = startRow + r;
-      if (studentIdx >= sortedStudents.length) break;
-      const student = sortedStudents[studentIdx];
+      if (studentIdx >= sortedRows.length) break;
+      const student = sortedRows[studentIdx];
 
       for (let c = 0; c < parsed[r].length; c++) {
         const fieldIdx = startCol + c;
@@ -172,7 +174,7 @@ export default function DataTable({
     }
 
     if (document.activeElement) document.activeElement.blur();
-  }, [sortedStudents, inputColumns, onBulkCellChange, parseClipboard]);
+  }, [sortedRows, inputColumns, onBulkCellChange, parseClipboard]);
 
   // 엑셀 붙여넣기 — 수정(override) 칼럼 대상
   const handleOverridePaste = useCallback((e, startRow) => {
@@ -182,8 +184,8 @@ export default function DataTable({
     const batch = {};
     for (let r = 0; r < parsed.length; r++) {
       const studentIdx = startRow + r;
-      if (studentIdx >= sortedStudents.length) break;
-      const student = sortedStudents[studentIdx];
+      if (studentIdx >= sortedRows.length) break;
+      const student = sortedRows[studentIdx];
       const raw = parsed[r][0].trim();
       const value = raw === '' ? null : Number(raw);
       if (value !== null && isNaN(value)) continue;
@@ -195,7 +197,7 @@ export default function DataTable({
     }
 
     if (document.activeElement) document.activeElement.blur();
-  }, [sortedStudents, onBulkOverrideChange, parseClipboard]);
+  }, [sortedRows, onBulkOverrideChange, parseClipboard]);
 
   const clickableClass = 'text-blue-600 hover:underline cursor-pointer';
 
@@ -243,34 +245,9 @@ export default function DataTable({
             ))}
           </TableRow>
 
-          {/* 가중치 행 */}
-          {showWeightRow && (
-            <TableRow className="bg-muted/30">
-              <TableCell className="text-xs text-muted-foreground font-medium">{weightLabel}</TableCell>
-              {columns.map(col => (
-                <TableCell key={col.id} className="text-center p-1">
-                  <Input
-                    type="number"
-                    value={col.weight ?? 1}
-                    onChange={e => {
-                      const v = e.target.value === '' ? 1 : Number(e.target.value);
-                      onWeightChange?.(col.id, v);
-                    }}
-                    className="h-6 w-14 text-center text-xs mx-auto"
-                    step="any"
-                    min={0}
-                  />
-                </TableCell>
-              ))}
-              {hasOverrideColumn && <TableCell />}
-              {resultColumns.map(rc => (
-                <TableCell key={rc.id} />
-              ))}
-            </TableRow>
-          )}
         </TableHeader>
         <TableBody>
-          {sortedStudents.map((student, rowIdx) => {
+          {sortedRows.map((student, rowIdx) => {
             const studentData = cellData[student.id] || {};
             const overrideVal = overrides?.[student.id];
             const hasOverride = overrideVal != null;
@@ -344,6 +321,31 @@ export default function DataTable({
               </TableRow>
             );
           })}
+          {/* 가중치 행 — 데이터 행 아래에 위치 */}
+          {showWeightRow && (
+            <TableRow className="bg-muted/30">
+              <TableCell className="text-xs text-muted-foreground font-medium">{weightLabel}</TableCell>
+              {columns.map(col => (
+                <TableCell key={col.id} className="text-center p-1">
+                  <Input
+                    type="number"
+                    value={col.weight ?? 1}
+                    onChange={e => {
+                      const v = e.target.value === '' ? 1 : Number(e.target.value);
+                      onWeightChange?.(col.id, v);
+                    }}
+                    className="h-6 w-14 text-center text-xs mx-auto"
+                    step="any"
+                    min={0}
+                  />
+                </TableCell>
+              ))}
+              {hasOverrideColumn && <TableCell />}
+              {resultColumns.map(rc => (
+                <TableCell key={rc.id} />
+              ))}
+            </TableRow>
+          )}
         </TableBody>
       </Table>
     </div>

@@ -36,9 +36,8 @@ test.beforeAll(async ({ request }) => {
       data: { name },
     });
     const data = await res.json();
-    // students 배열의 마지막 항목
-    const students = data.students;
-    ids.push(students[students.length - 1].id);
+    // 단일 추가 응답: { student, data }
+    ids.push(data.student?.id ?? data.data?.students?.at(-1)?.id);
   }
   [s1Id, s2Id, s3Id, s4Id] = ids;
 
@@ -67,7 +66,7 @@ test.beforeAll(async ({ request }) => {
     },
   });
   const cat = await catRes.json();
-  teamCatId = cat.id;
+  teamCatId = cat.category?.id ?? cat.id;
 
   // 카테고리에 input_scope: 'team' 설정 + input_fields 추가
   const freshConfig = await (await request.get(`/api/cohorts/${cohortId}/config`)).json();

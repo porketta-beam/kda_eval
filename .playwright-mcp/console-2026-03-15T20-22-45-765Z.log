@@ -1,0 +1,3 @@
+[ 5298259ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/api/cohorts/4f62ea09-ee66-429b-90e3-f2f554e14285/config:0
+[ 5298303ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/api/cohorts/4f62ea09-ee66-429b-90e3-f2f554e14285/scores?calculated=true:0
+[ 5298306ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/api/cohorts/4f62ea09-ee66-429b-90e3-f2f554e14285/results:0

@@ -88,13 +88,15 @@ test.describe.serial('KDA 평가 시스템 E2E 워크플로우', () => {
     await page.locator('[data-slot="card"]').filter({ hasText: '테스트 2기' }).click();
     await expect(page.getByRole('link', { name: '평가 항목' })).toBeVisible();
 
+    // 항목 관리 Collapsible 열기
+    await page.getByRole('button', { name: '항목 관리' }).click();
     await page.getByRole('button', { name: '평가항목 추가' }).click();
     await page.getByPlaceholder('예: 수업참여도').fill('수업참여도');
     await page.getByRole('button', { name: '추가' }).last().click();
 
     // 다이얼로그 닫힘 대기
     await page.waitForTimeout(500);
-    await expect(page.getByText('수업참여도')).toBeVisible();
+    await expect(page.getByText('수업참여도').first()).toBeVisible();
   });
 
   test('5. 점수 입력', async ({ page, request }) => {
@@ -116,24 +118,26 @@ test.describe.serial('KDA 평가 시스템 E2E 워크플로우', () => {
     // 점수 입력 테이블이 표시되어야 함
     await expect(page.locator('table').getByText('김민수')).toBeVisible();
 
-    // 각 학생에게 점수 입력 (number input)
-    const inputs = page.locator('table input[type="number"]');
+    // 각 학생에게 점수 입력 (data-row 속성으로 점수 입력 셀만 타겟)
+    const inputs = page.locator('table input[data-row]');
     const count = await inputs.count();
     expect(count).toBeGreaterThanOrEqual(4);
 
     // 첫 번째 학생에 8점 입력
-    await inputs.first().fill('8');
+    const input0 = page.locator('table input[data-row="0"]').first();
+    await input0.fill('8');
     const [resp1] = await Promise.all([
       page.waitForResponse(resp => resp.url().includes('/scores/')),
-      inputs.first().blur(),
+      input0.blur(),
     ]);
     expect(resp1.status()).toBe(200);
 
     // 두 번째 학생에 6점 입력
-    await inputs.nth(1).fill('6');
+    const input1 = page.locator('table input[data-row="1"]').first();
+    await input1.fill('6');
     const [resp2] = await Promise.all([
       page.waitForResponse(resp => resp.url().includes('/scores/')),
-      inputs.nth(1).blur(),
+      input1.blur(),
     ]);
     expect(resp2.status()).toBe(200);
 
@@ -149,12 +153,13 @@ test.describe.serial('KDA 평가 시스템 E2E 워크플로우', () => {
     await page.locator('[data-slot="card"]').filter({ hasText: '테스트 2기' }).click();
 
     // 두 번째 카테고리 추가
+    await page.getByRole('button', { name: '항목 관리' }).click();
     await page.getByRole('button', { name: '평가항목 추가' }).click();
     await page.getByPlaceholder('예: 수업참여도').fill('출석률');
     await page.getByRole('button', { name: '추가' }).last().click();
     await page.waitForTimeout(500);
 
-    await expect(page.getByText('출석률')).toBeVisible();
+    await expect(page.getByText('출석률').first()).toBeVisible();
 
     // ↑ 버튼으로 순서 변경
     const upButtons = page.locator('button:has-text("↑")');
@@ -169,8 +174,10 @@ test.describe.serial('KDA 평가 시스템 E2E 워크플로우', () => {
     page.on('dialog', dialog => dialog.accept());
     await page.locator('[data-slot="card"]').filter({ hasText: '테스트 2기' }).click();
 
-    await expect(page.getByText('수업참여도')).toBeVisible();
-    await expect(page.getByText('출석률')).toBeVisible();
+    // 항목 관리 Collapsible 열기
+    await page.getByRole('button', { name: '항목 관리' }).click();
+    await expect(page.getByText('수업참여도').first()).toBeVisible();
+    await expect(page.getByText('출석률').first()).toBeVisible();
 
     // × 버튼으로 삭제 (마지막 카테고리)
     const deleteButtons = page.locator('button:has-text("×")');
@@ -200,7 +207,7 @@ test.describe.serial('KDA 평가 시스템 E2E 워크플로우', () => {
     expect(resultsData.results.totals).toBeTruthy();
 
     // 사이드바에 학생 이름이 나타나는지 확인
-    await expect(page.locator('text=김민수')).toBeVisible();
+    await expect(page.locator('text=김민수').first()).toBeVisible();
 
     // 예상 모드 토글
     const modeSwitch = page.locator('#mode-toggle');

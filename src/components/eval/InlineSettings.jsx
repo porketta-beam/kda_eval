@@ -98,7 +98,7 @@ export default function InlineSettings({ category, onSave }) {
         </div>
 
         {/* 방식별 파라미터 */}
-        <MethodConfig method={local.scoring_method} config={local.config} onChange={handleConfigChange} />
+        <MethodConfig method={local.scoring_method} config={local.config} onChange={handleConfigChange} category={local} />
 
         <div className="flex justify-end">
           <Button size="sm" onClick={handleSave}>설정 저장</Button>
@@ -108,7 +108,7 @@ export default function InlineSettings({ category, onSave }) {
   );
 }
 
-function MethodConfig({ method, config, onChange }) {
+function MethodConfig({ method, config, onChange, category }) {
   switch (method) {
     case SCORING_METHOD.WEIGHTED_AVERAGE:
       return (
@@ -191,6 +191,13 @@ function MethodConfig({ method, config, onChange }) {
         <div>
           <Label className="text-sm">최종 공식</Label>
           <Input value={config.final_formula ?? ''} onChange={e => onChange('final_formula', e.target.value)} className="h-8" placeholder="(sub1 + sub2) * 15 / 100" />
+          {(category?.sub_categories?.length ?? 0) > 0 && (
+            <div data-testid="formula-var-hints" className="text-xs text-muted-foreground mt-1">
+              {category.sub_categories.map((s, i) => (
+                <div key={s.id}>_cat{i} = {s.name}</div>
+              ))}
+            </div>
+          )}
         </div>
       );
 

@@ -68,8 +68,13 @@ export default function HomePage() {
         alert(err.error || '생성 실패');
         return;
       }
+      const data = await res.json();
       setDialogOpen(false);
       setNewName(''); setCloneMode(false);
+      if (data.id) {
+        router.push(`/cohort/${encodeURIComponent(data.id)}`);
+        return;
+      }
       fetchCohorts();
     } catch (err) {
       alert('생성 실패: ' + err.message);
