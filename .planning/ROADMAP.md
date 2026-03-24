@@ -31,7 +31,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans:** 2 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Core engine: schema V1 constants, override-aware scoring, config-service addSubCategory, unit tests
+- [x] 01-01-PLAN.md — Core engine: schema V1 constants, override-aware scoring, config-service addSubCategory, unit tests
 - [ ] 01-02-PLAN.md — UI layer: rank column always visible, weight row for v1 methods, unified FieldManager, method selector restriction, E2E test
 
 ### Phase 2: Tree Navigation & Manipulation UI

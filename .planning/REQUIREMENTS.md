@@ -9,13 +9,13 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### 재귀 트리 구조 (Tree Structure)
 
-- [ ] **TREE-01**: 임의 깊이로 하위 카테고리를 생성할 수 있다 (재귀 중첩)
+- [x] **TREE-01**: 임의 깊이로 하위 카테고리를 생성할 수 있다 (재귀 중첩)
 - [ ] **TREE-02**: 각 카테고리 노드를 클릭하면 독립 페이지로 열린다 (Notion식 내비게이션)
 - [ ] **TREE-03**: 어떤 깊이에서든 하위 카테고리를 추가할 수 있다
 - [ ] **TREE-04**: 어떤 깊이에서든 카테고리를 삭제할 수 있다 (확인 다이얼로그 포함)
-- [ ] **TREE-05**: 부모 노드는 하위 항목의 점수를 자동으로 집계한다
-- [ ] **TREE-06**: 어떤 노드에서든 소계를 직접 입력하면 하위 항목의 집계값을 덮어쓴다 (override)
-- [ ] **TREE-07**: 하위 항목이 있는 노드에서도 직접 입력이 가능하다 (leaf 제한 없음)
+- [x] **TREE-05**: 부모 노드는 하위 항목의 점수를 자동으로 집계한다
+- [x] **TREE-06**: 어떤 노드에서든 소계를 직접 입력하면 하위 항목의 집계값을 덮어쓴다 (override)
+- [x] **TREE-07**: 하위 항목이 있는 노드에서도 직접 입력이 가능하다 (leaf 제한 없음)
 - [ ] **TREE-08**: 브레드크럼 내비게이션이 모든 깊이에서 정확히 동작한다
 
 ### 팀 점수 입력 (Team Scoring)
@@ -32,7 +32,7 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### 평가 구조 변경 (Config Flexibility)
 
-- [ ] **CONF-01**: 코호트별로 독립적인 평가 트리 구조를 가질 수 있다
+- [x] **CONF-01**: 코호트별로 독립적인 평가 트리 구조를 가질 수 있다
 - [ ] **CONF-02**: 카테고리의 스코어링 메서드를 언제든 변경할 수 있다
 - [ ] **CONF-03**: 카테고리의 가중치/설정을 UI에서 직관적으로 변경할 수 있다
 
@@ -70,13 +70,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TREE-01 | Phase 1 | Pending |
+| TREE-01 | Phase 1 | Complete |
 | TREE-02 | Phase 2 | Pending |
 | TREE-03 | Phase 2 | Pending |
 | TREE-04 | Phase 2 | Pending |
-| TREE-05 | Phase 1 | Pending |
-| TREE-06 | Phase 1 | Pending |
-| TREE-07 | Phase 1 | Pending |
+| TREE-05 | Phase 1 | Complete |
+| TREE-06 | Phase 1 | Complete |
+| TREE-07 | Phase 1 | Complete |
 | TREE-08 | Phase 2 | Pending |
 | TEAM-01 | Phase 4 | Pending |
 | TEAM-02 | Phase 4 | Pending |
@@ -84,7 +84,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SCORE-01 | Phase 3 | Pending |
 | SCORE-02 | Phase 3 | Pending |
 | SCORE-03 | Phase 3 | Pending |
-| CONF-01 | Phase 1 | Pending |
+| CONF-01 | Phase 1 | Complete |
 | CONF-02 | Phase 2 | Pending |
 | CONF-03 | Phase 2 | Pending |
 
