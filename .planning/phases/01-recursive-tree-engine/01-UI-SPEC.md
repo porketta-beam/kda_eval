@@ -5,6 +5,7 @@ status: draft
 shadcn_initialized: true
 preset: radix-nova (neutral base, CSS variables)
 created: 2026-03-24
+revised: 2026-03-24
 ---
 
 # Phase 1 — UI Design Contract
@@ -27,6 +28,12 @@ created: 2026-03-24
 
 ---
 
+## Focal Point
+
+The primary visual anchor of the modified DataTable view is the **weight row** -- the editable row pinned between the table header and the first data row. Its shared header-level background (`--color-table-header-bg`) and compact number inputs draw the administrator's eye to per-column weight configuration before scanning student score data below.
+
+---
+
 ## Spacing Scale
 
 Declared values (must be multiples of 4):
@@ -41,7 +48,11 @@ Declared values (must be multiples of 4):
 | 2xl | 48px | Major section breaks |
 | 3xl | 64px | Page-level spacing |
 
-Exceptions: none. Existing codebase uses Tailwind spacing utilities (p-1 = 4px, p-3 = 12px, p-6 = 24px, p-8 = 32px) which map closely to this scale. The existing 12px (p-3) usage on CategoryCard is acceptable as Tailwind convention.
+### Legacy Exception
+
+| Token | Value | Status | Usage |
+|-------|-------|--------|-------|
+| legacy-sm | 12px (Tailwind `p-3`) | Legacy exception -- do not introduce new usages | Existing `CategoryCard` inner padding. Retained for backward compatibility with current component styles. New components must use 8px or 16px instead. |
 
 **Source:** Existing component patterns in `EvalNode.jsx`, `CategoryCard.jsx`, `DataTable.jsx`.
 
@@ -49,14 +60,16 @@ Exceptions: none. Existing codebase uses Tailwind spacing utilities (p-1 = 4px, 
 
 ## Typography
 
+Two weights only: 400 (regular) and 600 (semibold).
+
 | Role | Size | Weight | Line Height | Tailwind Class |
 |------|------|--------|-------------|----------------|
 | Body | 14px | 400 (regular) | 1.5 | `text-sm` |
-| Label | 14px | 600 (semibold) | 1.5 | `text-sm font-semibold` |
+| Label / Table header | 14px | 600 (semibold) | 1.5 | `text-sm font-semibold` |
 | Heading | 16px | 600 (semibold) | 1.25 | `text-base font-semibold` (not used in Phase 1 -- no new headings) |
-| Table header | 14px | 500 (medium) | 1.25 | `text-sm font-medium` |
+| Weight row label | 12px | 600 (semibold) | 1.5 | `text-xs font-semibold` |
 
-**Phase 1 note:** No new typography roles introduced. All text uses existing `text-sm` (14px) for table content and labels. Weight row label uses `text-xs` (12px) at weight 500 as a sub-label role, consistent with existing badge text sizing.
+**Weight consolidation (revision 2026-03-24):** Previous draft declared three weights (400, 500, 600). Weight 500 (medium) has been removed. All roles previously assigned `font-medium` -- table header cells and weight row labels -- are now `font-semibold` (600). This aligns the contract with the two-weight maximum.
 
 **Source:** Existing DataTable and EvalNode rendering patterns. Font loaded as Geist in `src/app/layout.js`.
 
@@ -167,7 +180,7 @@ None.
 **Visual contract:**
 - Rendered as a special row between the table header and the first data row
 - Background: `--color-table-header-bg` (same as header)
-- First cell: label text `가중치` (for average/user_input) or `배수` (for sum), styled `text-xs text-muted-foreground font-medium`
+- First cell: label text `가중치` (for average/user_input) or `배수` (for sum), styled `text-xs font-semibold text-muted-foreground`
 - Each column cell: editable `<Input>` of type number, compact sizing (`h-7 w-16 text-center text-xs`), default value `1`
 - Weight input accepts positive numbers only. Empty input saves as `1` (default).
 
