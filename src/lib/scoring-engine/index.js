@@ -88,9 +88,10 @@ function calculateTeamCategory(category, allRawScores, students, teams, method) 
  * @param {Object} allRawScores - scores.json의 raw_scores 전체
  * @param {import('@/lib/schema').Student[]} students
  * @param {import('@/lib/schema').Team[]} teams
+ * @param {Object} [overrides] - { [categoryId]: { [studentId]: number|null } } (per D-04)
  * @returns {Object<string, {raw: *, calculated: number}>}
  */
-export function calculateCategory(category, allRawScores, students, teams = []) {
+export function calculateCategory(category, allRawScores, students, teams = [], overrides = {}) {
   const method = METHOD_MAP[category.scoring_method];
   if (!method) {
     throw new Error(`Unknown scoring method: ${category.scoring_method}`);
@@ -117,7 +118,17 @@ export function calculateCategory(category, allRawScores, students, teams = []) 
     // 1. 하위항목 재귀 계산
     const subResults = {};
     for (const sub of subCategories) {
-      subResults[sub.id] = calculateCategory(sub, allRawScores, students, teams);
+      subResults[sub.id] = calculateCategory(sub, allRawScores, students, teams, overrides);
+    }
+
+    // 하위항목 override 적용 (per D-04)
+    for (const sub of subCategories) {
+      for (const student of activeStudents) {
+        const overrideVal = overrides[sub.id]?.[student.id];
+        if (overrideVal != null && subResults[sub.id]?.[student.id]) {
+          subResults[sub.id][student.id].calculated = overrideVal;
+        }
+      }
     }
 
     // 2. augmented category 생성 (input_fields + 하위항목을 가상 필드로 병합)
@@ -129,12 +140,16 @@ export function calculateCategory(category, allRawScores, students, teams = []) 
     // 4. 기존 method로 계산
     const results = method.calculate(augmentedCategory, augmentedScores, activeStudents, teams);
 
-    // 5. 결과에 sub_scores 첨부
+    // 5. 결과에 sub_scores 첨부 + 현재 노드 override 적용 (per D-04)
     for (const student of activeStudents) {
       if (results[student.id]) {
         results[student.id].sub_scores = {};
         for (const sub of subCategories) {
           results[student.id].sub_scores[sub.id] = subResults[sub.id]?.[student.id] ?? { calculated: 0 };
+        }
+        const ownOverride = overrides[category.id]?.[student.id];
+        if (ownOverride != null) {
+          results[student.id].calculated = ownOverride;
         }
       }
     }
@@ -143,19 +158,28 @@ export function calculateCategory(category, allRawScores, students, teams = []) 
   }
 
   // 일반 방식: 해당 카테고리의 raw scores만 추출
-  return method.calculate(category, categoryScores, activeStudents, teams);
+  const results = method.calculate(category, categoryScores, activeStudents, teams);
+  // leaf 노드 override 적용 (per D-04)
+  for (const student of activeStudents) {
+    const ownOverride = overrides[category.id]?.[student.id];
+    if (ownOverride != null && results[student.id]) {
+      results[student.id].calculated = ownOverride;
+    }
+  }
+  return results;
 }
 
 /**
  * 전체 카테고리 계산
+ * @param {Object} [overrides] - { [categoryId]: { [studentId]: number|null } }
  * @returns {Object<string, Object<string, {raw: *, calculated: number}>>}
  */
-export function calculateAllCategories(config, rawScores, students) {
+export function calculateAllCategories(config, rawScores, students, overrides = {}) {
   const results = {};
   const teams = config.teams || [];
 
   for (const category of config.evaluation_categories) {
-    results[category.id] = calculateCategory(category, rawScores, students, teams);
+    results[category.id] = calculateCategory(category, rawScores, students, teams, overrides);
   }
 
   return results;
@@ -167,7 +191,7 @@ export function calculateAllCategories(config, rawScores, students) {
  * @param {Object} [overrides] - { [categoryId]: { [studentId]: number|null } }
  */
 export function calculateTotals(config, rawScores, students, overrides = {}) {
-  const categoryResults = calculateAllCategories(config, rawScores, students);
+  const categoryResults = calculateAllCategories(config, rawScores, students, overrides);
   const activeStudents = students.filter(s => !s.is_dropout);
   const totals = {};
   const aggSettings = config.aggregation_settings || {};
@@ -225,7 +249,7 @@ export function calculateProjectedScores(config, rawScores, students, overrides 
   const activeStudents = students.filter(s => !s.is_dropout);
 
   // 먼저 실제 계산 수행
-  const actualResults = calculateAllCategories(config, rawScores, activeStudents);
+  const actualResults = calculateAllCategories(config, rawScores, activeStudents, overrides);
 
   // 카테고리별 평균 계산
   const categoryAverages = {};
@@ -278,4 +302,40 @@ export function calculateProjectedScores(config, rawScores, students, overrides 
   }
 
   return { categoryResults: actualResults, totals: projectedTotals };
+}
+
+/**
+ * 카테고리 내 학생 순위 계산 (standard competition ranking: 1,1,3)
+ * @param {Object} calcResults - { [studentId]: { calculated: number } }
+ * @param {Object} [overrides] - { [studentId]: number|null }
+ * @returns {Object<string, number|null>} - { [studentId]: rank }
+ */
+export function computeCategoryRanks(calcResults, overrides = {}) {
+  const entries = Object.entries(calcResults)
+    .map(([sid, r]) => {
+      const overrideVal = overrides[sid];
+      const score = overrideVal != null ? overrideVal : (r?.calculated ?? null);
+      return [sid, score];
+    })
+    .filter(([, score]) => score != null)
+    .sort(([, a], [, b]) => b - a);
+
+  const ranks = {};
+  // null score 학생은 순위 없음
+  for (const [sid, r] of Object.entries(calcResults)) {
+    const overrideVal = overrides[sid];
+    const score = overrideVal != null ? overrideVal : (r?.calculated ?? null);
+    if (score == null) {
+      ranks[sid] = null;
+    }
+  }
+
+  let currentRank = 1;
+  for (let i = 0; i < entries.length; i++) {
+    if (i > 0 && entries[i][1] !== entries[i - 1][1]) {
+      currentRank = i + 1;
+    }
+    ranks[entries[i][0]] = currentRank;
+  }
+  return ranks;
 }
