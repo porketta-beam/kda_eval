@@ -17,7 +17,9 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-import { SCORING_METHOD, METHOD_LABELS } from '@/lib/schema';
+import { SCORING_METHOD, METHOD_LABELS, V1_SCORING_METHOD, V1_METHOD_LABELS, isDeprecatedMethod } from '@/lib/schema';
+import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 // 빈 문자열 허용 number 변환 (입력 중 0 삭제 가능)
 const numVal = (v) => v === '' ? '' : Number(v);
@@ -76,14 +78,31 @@ export default function InlineSettings({ category, onSave }) {
           </div>
           <div>
             <Label className="text-sm">방식</Label>
-            <Select value={local.scoring_method} onValueChange={v => handleChange('scoring_method', v)}>
-              <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {Object.entries(SCORING_METHOD).map(([key, val]) => (
-                  <SelectItem key={val} value={val}>{METHOD_LABELS[val] || key}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {isDeprecatedMethod(category.scoring_method) ? (
+              // deprecated 메서드: 읽기 전용 Badge (per D-13, UI-SPEC interaction contract 3)
+              <div className="mt-1">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge variant="secondary" className="text-muted-foreground">
+                      {METHOD_LABELS[category.scoring_method] || category.scoring_method}
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>이 평가 방식은 더 이상 새로 생성할 수 없습니다</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            ) : (
+              // v1 메서드: 드롭다운 (per D-10)
+              <Select value={local.scoring_method} onValueChange={v => handleChange('scoring_method', v)}>
+                <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {Object.entries(V1_SCORING_METHOD).map(([key, val]) => (
+                    <SelectItem key={val} value={val}>{V1_METHOD_LABELS[val]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
           <div className="flex items-end">
             <div className="flex items-center gap-2">

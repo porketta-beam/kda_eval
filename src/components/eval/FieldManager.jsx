@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,39 +17,23 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
-import { SCORING_METHOD, METHOD_LABELS, INPUT_FIELD_TYPE } from '@/lib/schema';
+import { Separator } from '@/components/ui/separator';
+import { INPUT_FIELD_TYPE, V1_SCORING_METHOD, V1_METHOD_LABELS } from '@/lib/schema';
 
-export default function FieldManager({ category, onSave }) {
+/**
+ * 통합 필드 관리자 — 입력 필드 + 하위 항목 두 섹션을 항상 동시 표시 (per D-07)
+ * @param {Object} props
+ * @param {Object} props.category - 현재 카테고리
+ * @param {Function} props.onSave - 카테고리 업데이트 콜백
+ * @param {string} props.cohortId - 코호트 ID
+ */
+export default function FieldManager({ category, onSave, cohortId }) {
   const [open, setOpen] = useState(false);
-  const isComposite = category.scoring_method === SCORING_METHOD.COMPOSITE;
-
-  if (isComposite) {
-    return (
-      <CompositeManager
-        category={category}
-        onSave={onSave}
-        open={open}
-        setOpen={setOpen}
-      />
-    );
-  }
-
-  return (
-    <LeafManager
-      category={category}
-      onSave={onSave}
-      open={open}
-      setOpen={setOpen}
-    />
-  );
-}
-
-// ─── Leaf: input_fields 관리 ────────────────────────────────
-
-function LeafManager({ category, onSave, open, setOpen }) {
   const [fields, setFields] = useState(category.input_fields || []);
 
-  const handleAdd = () => {
+  // ─── 입력 필드 핸들러 ─────────────────────────────────────
+
+  const handleAddField = () => {
     const newField = {
       id: uuidv4(),
       name: `필드${fields.length + 1}`,
@@ -61,12 +45,12 @@ function LeafManager({ category, onSave, open, setOpen }) {
     setFields([...fields, newField]);
   };
 
-  const handleDelete = (fieldId) => {
+  const handleDeleteField = (fieldId) => {
     if (!confirm('이 입력필드를 삭제하시겠습니까? (기존 점수 데이터는 보존됩니다)')) return;
     setFields(fields.filter(f => f.id !== fieldId));
   };
 
-  const handleMove = (index, direction) => {
+  const handleMoveField = (index, direction) => {
     const newFields = [...fields];
     const targetIndex = index + direction;
     if (targetIndex < 0 || targetIndex >= newFields.length) return;
@@ -80,219 +64,178 @@ function LeafManager({ category, onSave, open, setOpen }) {
     ));
   };
 
-  const handleSave = () => {
+  const handleSaveFields = () => {
     onSave?.({ ...category, input_fields: fields });
   };
 
+  // ─── 하위 항목 핸들러 ─────────────────────────────────────
+
+  const categoryId = category.id;
+  const handleAddSubCategory = useCallback(async () => {
+    if (!cohortId || !categoryId) return;
+    try {
+      const enc = encodeURIComponent;
+      const res = await fetch(
+        `/api/cohorts/${enc(cohortId)}/config/categories/${enc(categoryId)}/subcategories`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: '새 항목',
+            scoring_method: V1_SCORING_METHOD.AVERAGE,
+          }),
+        }
+      );
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || '하위 항목 추가 실패');
+      }
+      // 데이터 갱신은 WebSocket data-changed 이벤트로 자동 처리됨
+    } catch (err) {
+      alert('하위 항목 추가 중 오류: ' + err.message);
+    }
+  }, [cohortId, categoryId]);
+
+  const handleDeleteSubCategory = useCallback(async (subCatId) => {
+    if (!confirm('이 하위 항목을 삭제하시겠습니까? 하위 점수 데이터는 보존됩니다.')) return;
+    if (!cohortId) return;
+    try {
+      const enc = encodeURIComponent;
+      const res = await fetch(
+        `/api/cohorts/${enc(cohortId)}/config/categories/${enc(subCatId)}`,
+        { method: 'DELETE' }
+      );
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || '하위 항목 삭제 실패');
+      }
+    } catch (err) {
+      alert('하위 항목 삭제 중 오류: ' + err.message);
+    }
+  }, [cohortId]);
+
+  const subCategories = category.sub_categories || [];
+  const hasBothSections = fields.length > 0 && subCategories.length > 0;
+
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
       <div className="flex items-center gap-2 mt-4 mb-2">
         <CollapsibleTrigger asChild>
           <Button variant="ghost" size="sm">
-            {open ? '▼' : '▶'} 입력필드 관리
+            {open ? '▼' : '▶'} 필드 관리
           </Button>
         </CollapsibleTrigger>
       </div>
       <CollapsibleContent className="border rounded-lg p-4 mb-4 space-y-3">
-        {fields.length === 0 && (
-          <p className="text-sm text-muted-foreground">입력필드가 없습니다.</p>
-        )}
-        {fields.map((field, idx) => (
-          <div key={field.id} className="flex items-center gap-2 p-2 rounded border">
-            <Input
-              value={field.name}
-              onChange={e => handleFieldChange(field.id, 'name', e.target.value)}
-              className="h-7 w-32 text-sm"
-              placeholder="필드명"
-            />
-            <Select
-              value={field.type}
-              onValueChange={v => handleFieldChange(field.id, 'type', v)}
-            >
-              <SelectTrigger className="h-7 w-24 text-sm">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={INPUT_FIELD_TYPE.NUMBER}>숫자</SelectItem>
-                <SelectItem value={INPUT_FIELD_TYPE.TEXT}>텍스트</SelectItem>
-                <SelectItem value={INPUT_FIELD_TYPE.BOOLEAN}>체크</SelectItem>
-              </SelectContent>
-            </Select>
-            {field.type === INPUT_FIELD_TYPE.NUMBER && (
-              <>
-                <Label className="text-xs text-muted-foreground ml-1">min</Label>
-                <Input
-                  type="text"
-                  inputMode="numeric"
-                  value={field.min ?? ''}
-                  onChange={e => handleFieldChange(field.id, 'min', e.target.value === '' ? undefined : Number(e.target.value))}
-                  className="h-7 w-16 text-sm"
-                />
-                <Label className="text-xs text-muted-foreground">max</Label>
-                <Input
-                  type="text"
-                  inputMode="numeric"
-                  value={field.max ?? ''}
-                  onChange={e => handleFieldChange(field.id, 'max', e.target.value === '' ? undefined : Number(e.target.value))}
-                  className="h-7 w-16 text-sm"
-                />
-              </>
-            )}
-            <Label className="text-xs text-muted-foreground ml-1">가중치</Label>
-            <Input
-              type="text"
-              inputMode="numeric"
-              value={field.weight ?? 1}
-              onChange={e => handleFieldChange(field.id, 'weight', e.target.value === '' ? 1 : Number(e.target.value))}
-              className="h-7 w-14 text-sm"
-            />
-            <div className="flex items-center gap-0.5 ml-auto">
-              {idx > 0 && (
-                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground" onClick={() => handleMove(idx, -1)}>
-                  ↑
-                </Button>
+        {/* ─── 섹션 1: 입력 필드 ───────────────────────────── */}
+        <div>
+          <Label className="text-xs font-semibold text-muted-foreground mb-2 block">입력 필드</Label>
+          {fields.length === 0 && (
+            <p className="text-sm text-muted-foreground">입력필드가 없습니다.</p>
+          )}
+          {fields.map((field, idx) => (
+            <div key={field.id} className="flex items-center gap-2 p-2 rounded border mb-1">
+              <Input
+                value={field.name}
+                onChange={e => handleFieldChange(field.id, 'name', e.target.value)}
+                className="h-7 w-32 text-sm"
+                placeholder="필드명"
+              />
+              <Select
+                value={field.type}
+                onValueChange={v => handleFieldChange(field.id, 'type', v)}
+              >
+                <SelectTrigger className="h-7 w-24 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={INPUT_FIELD_TYPE.NUMBER}>숫자</SelectItem>
+                  <SelectItem value={INPUT_FIELD_TYPE.TEXT}>텍스트</SelectItem>
+                  <SelectItem value={INPUT_FIELD_TYPE.BOOLEAN}>체크</SelectItem>
+                </SelectContent>
+              </Select>
+              {field.type === INPUT_FIELD_TYPE.NUMBER && (
+                <>
+                  <Label className="text-xs text-muted-foreground ml-1">min</Label>
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    value={field.min ?? ''}
+                    onChange={e => handleFieldChange(field.id, 'min', e.target.value === '' ? undefined : Number(e.target.value))}
+                    className="h-7 w-16 text-sm"
+                  />
+                  <Label className="text-xs text-muted-foreground">max</Label>
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    value={field.max ?? ''}
+                    onChange={e => handleFieldChange(field.id, 'max', e.target.value === '' ? undefined : Number(e.target.value))}
+                    className="h-7 w-16 text-sm"
+                  />
+                </>
               )}
-              {idx < fields.length - 1 && (
-                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground" onClick={() => handleMove(idx, 1)}>
-                  ↓
+              <Label className="text-xs text-muted-foreground ml-1">가중치</Label>
+              <Input
+                type="text"
+                inputMode="numeric"
+                value={field.weight ?? 1}
+                onChange={e => handleFieldChange(field.id, 'weight', e.target.value === '' ? 1 : Number(e.target.value))}
+                className="h-7 w-14 text-sm"
+              />
+              <div className="flex items-center gap-0.5 ml-auto">
+                {idx > 0 && (
+                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground" onClick={() => handleMoveField(idx, -1)}>
+                    ↑
+                  </Button>
+                )}
+                {idx < fields.length - 1 && (
+                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground" onClick={() => handleMoveField(idx, 1)}>
+                    ↓
+                  </Button>
+                )}
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => handleDeleteField(field.id)}>
+                  ×
                 </Button>
-              )}
-              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => handleDelete(field.id)}>
-                ×
-              </Button>
+              </div>
             </div>
+          ))}
+          <div className="flex items-center gap-2 mt-2">
+            <Button variant="outline" size="sm" onClick={handleAddField}>
+              + 입력 필드 추가
+            </Button>
+            <Button size="sm" onClick={handleSaveFields}>
+              저장
+            </Button>
           </div>
-        ))}
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleAdd}>
-            + 필드 추가
-          </Button>
-          <Button size="sm" onClick={handleSave}>
-            저장
-          </Button>
         </div>
-      </CollapsibleContent>
-    </Collapsible>
-  );
-}
 
-// ─── Composite: sub_categories 관리 ─────────────────────────
+        {/* 구분선 — 두 섹션 모두 항목이 있을 때만 */}
+        {hasBothSections && <Separator />}
 
-function CompositeManager({ category, onSave, open, setOpen }) {
-  const [subs, setSubs] = useState(category.sub_categories || []);
-
-  const handleAdd = () => {
-    const newSub = {
-      id: uuidv4(),
-      name: `하위항목${subs.length + 1}`,
-      order: subs.length + 1,
-      max_score: 10,
-      is_bonus: false,
-      scoring_method: SCORING_METHOD.USER_INPUT,
-      config: {},
-      input_fields: [],
-    };
-    setSubs([...subs, newSub]);
-  };
-
-  const handleDelete = (subId) => {
-    if (!confirm('이 하위항목을 삭제하시겠습니까? (기존 점수 데이터는 보존됩니다)')) return;
-    setSubs(subs.filter(s => s.id !== subId));
-  };
-
-  const handleMove = (index, direction) => {
-    const newSubs = [...subs];
-    const targetIndex = index + direction;
-    if (targetIndex < 0 || targetIndex >= newSubs.length) return;
-    [newSubs[index], newSubs[targetIndex]] = [newSubs[targetIndex], newSubs[index]];
-    // update order
-    newSubs.forEach((s, i) => { s.order = i + 1; });
-    setSubs(newSubs);
-  };
-
-  const handleSubChange = (subId, key, value) => {
-    setSubs(subs.map(s =>
-      s.id === subId ? { ...s, [key]: value } : s
-    ));
-  };
-
-  const handleSave = () => {
-    onSave?.({ ...category, sub_categories: subs });
-  };
-
-  return (
-    <Collapsible open={open} onOpenChange={setOpen}>
-      <div className="flex items-center gap-2 mt-4 mb-2">
-        <CollapsibleTrigger asChild>
-          <Button variant="ghost" size="sm">
-            {open ? '▼' : '▶'} 하위항목 관리
-          </Button>
-        </CollapsibleTrigger>
-      </div>
-      <CollapsibleContent className="border rounded-lg p-4 mb-4 space-y-3">
-        {subs.length === 0 && (
-          <p className="text-sm text-muted-foreground">하위항목이 없습니다.</p>
-        )}
-        {subs.map((sub, idx) => (
-          <div key={sub.id} className="flex items-center gap-2 p-2 rounded border">
-            <Input
-              value={sub.name}
-              onChange={e => handleSubChange(sub.id, 'name', e.target.value)}
-              className="h-7 w-40 text-sm"
-              placeholder="항목명"
-            />
-            <Label className="text-xs text-muted-foreground ml-1">만점</Label>
-            <Input
-              type="text"
-              inputMode="numeric"
-              value={sub.max_score}
-              onChange={e => handleSubChange(sub.id, 'max_score', e.target.value === '' ? '' : Number(e.target.value) || 0)}
-              className="h-7 w-16 text-sm"
-            />
-            <Select
-              value={sub.scoring_method}
-              onValueChange={v => handleSubChange(sub.id, 'scoring_method', v)}
-            >
-              <SelectTrigger className="h-7 w-28 text-sm">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(SCORING_METHOD).map(([key, val]) => (
-                  <SelectItem key={val} value={val}>{METHOD_LABELS[val] || key}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Label className="text-xs text-muted-foreground ml-1">가중치</Label>
-            <Input
-              type="text"
-              inputMode="numeric"
-              value={sub.weight ?? 1}
-              onChange={e => handleSubChange(sub.id, 'weight', e.target.value === '' ? 1 : Number(e.target.value))}
-              className="h-7 w-14 text-sm"
-            />
-            <div className="flex items-center gap-0.5 ml-auto">
-              {idx > 0 && (
-                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground" onClick={() => handleMove(idx, -1)}>
-                  ↑
-                </Button>
-              )}
-              {idx < subs.length - 1 && (
-                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground" onClick={() => handleMove(idx, 1)}>
-                  ↓
-                </Button>
-              )}
-              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive hover:text-destructive" onClick={() => handleDelete(sub.id)}>
+        {/* ─── 섹션 2: 하위 항목 ───────────────────────────── */}
+        <div>
+          <Label className="text-xs font-semibold text-muted-foreground mb-2 block">하위 항목</Label>
+          {subCategories.length === 0 && (
+            <p className="text-sm text-muted-foreground">하위 항목이 없습니다.</p>
+          )}
+          {subCategories.map((sub) => (
+            <div key={sub.id} className="flex items-center gap-2 p-2 rounded border mb-1">
+              <span className="text-sm flex-1 min-w-0 truncate">{sub.name}</span>
+              <span className="text-xs text-muted-foreground">
+                {V1_METHOD_LABELS[sub.scoring_method] || sub.scoring_method}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                onClick={() => handleDeleteSubCategory(sub.id)}
+              >
                 ×
               </Button>
             </div>
-          </div>
-        ))}
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleAdd}>
-            + 하위항목 추가
-          </Button>
-          <Button size="sm" onClick={handleSave}>
-            저장
+          ))}
+          <Button variant="outline" size="sm" className="mt-2" onClick={handleAddSubCategory}>
+            + 하위 항목 추가
           </Button>
         </div>
       </CollapsibleContent>

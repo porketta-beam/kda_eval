@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useCohortDataContext } from '@/hooks/CohortDataContext';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { SCORING_METHOD, COLUMN_TYPE } from '@/lib/schema';
+import { SCORING_METHOD, COLUMN_TYPE, isDeprecatedMethod } from '@/lib/schema';
 import { buildTableColumns, buildCellData, buildResultColumns } from '@/lib/table-helpers';
 import InlineSettings from '@/components/eval/InlineSettings';
 import DataTable from '@/components/eval/DataTable';
@@ -242,7 +242,8 @@ export default function EvalNode({ cohortId, path }) {
     return buildResultColumns(category, calcResults, categoryOverrides, true);
   }, [isRoot, results, scores, categoryId, category, categoryOverrides]);
 
-  const showWeightRow = !isRoot && tableColumns.length > 0 && !isComposite;
+  // 가중치 행: v1 메서드에서만 표시 (deprecated 메서드 제외, per D-02 + UI-SPEC)
+  const showWeightRow = !isRoot && tableColumns.length > 0 && !isDeprecatedMethod(category.scoring_method);
 
   // ── Render ─────────────────────────────────────────────────────────────────
   // config 로딩 완료 여부로 렌더 결정 (scores/results 실패해도 config만 있으면 렌더 가능)
@@ -370,7 +371,7 @@ export default function EvalNode({ cohortId, path }) {
       />
 
       {/* FieldManager (non-root) */}
-      {!isRoot && <FieldManager category={category} onSave={handleSettingsSave} />}
+      {!isRoot && <FieldManager category={category} onSave={handleSettingsSave} cohortId={cohortId} />}
 
       {/* Conflict Dialog */}
       <ConflictDialog

@@ -2,10 +2,10 @@
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { SCORING_METHOD, METHOD_LABELS } from '@/lib/schema';
+import { SCORING_METHOD, METHOD_LABELS, V1_METHOD_LABELS } from '@/lib/schema';
 
 export default function CategoryCard({ category, scores, students, onClick, onDelete, onMoveUp, onMoveDown }) {
-  const methodLabel = METHOD_LABELS[category.scoring_method] || category.scoring_method;
+  const methodLabel = V1_METHOD_LABELS[category.scoring_method] || METHOD_LABELS[category.scoring_method] || category.scoring_method;
 
   // 진행률 계산: 점수가 입력된 학생 수 / 전체 활성 학생 수
   const activeStudents = students?.filter(s => !s.is_dropout) || [];
