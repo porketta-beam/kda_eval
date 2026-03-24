@@ -2,8 +2,9 @@
 
 import { readJSON, getConfigPath } from '@/lib/storage/file-store';
 import { writeWithLock } from '@/lib/storage/locking';
-import { createCategory, SCORING_METHOD } from '@/lib/schema';
+import { createCategory, SCORING_METHOD, V1_SCORING_METHOD } from '@/lib/schema';
 import { v4 as uuidv4 } from 'uuid';
+import { produce } from 'immer';
 
 /** 기수 설정 조회 */
 export async function getConfig(cohortId) {
@@ -76,6 +77,48 @@ export async function reorderCategories(cohortId, orderedIds) {
   return saved;
 }
 
+/** 하위 카테고리 추가 (임의 깊이 부모에 자식 추가) */
+export async function addSubCategory(cohortId, parentCategoryId, childData) {
+  const config = await getConfig(cohortId);
+  if (!config) throw new Error(`Cohort ${cohortId} not found`);
+
+  const parent = findCategoryRecursive(config.evaluation_categories, parentCategoryId);
+  if (!parent) throw new Error(`Category ${parentCategoryId} not found`);
+
+  if (!parent.sub_categories) parent.sub_categories = [];
+  const maxOrder = parent.sub_categories.reduce((m, c) => Math.max(m, c.order), 0);
+
+  const child = createCategory(
+    childData.name,
+    childData.scoring_method || V1_SCORING_METHOD.AVERAGE,
+    childData.max_score || 0,
+    { ...childData, order: maxOrder + 1 },
+  );
+  parent.sub_categories.push(child);
+
+  const saved = await writeWithLock(getConfigPath(cohortId), config, config.version);
+  return { category: child, config: saved };
+}
+
+/** 하위 카테고리 순서 변경 */
+export async function reorderSubCategories(cohortId, parentCategoryId, orderedIds) {
+  const config = await getConfig(cohortId);
+  if (!config) throw new Error(`Cohort ${cohortId} not found`);
+
+  const parent = findCategoryRecursive(config.evaluation_categories, parentCategoryId);
+  if (!parent) throw new Error(`Category ${parentCategoryId} not found`);
+  if (!parent.sub_categories) parent.sub_categories = [];
+
+  orderedIds.forEach((id, index) => {
+    const cat = parent.sub_categories.find(c => c.id === id);
+    if (cat) cat.order = index + 1;
+  });
+  parent.sub_categories.sort((a, b) => a.order - b.order);
+
+  const saved = await writeWithLock(getConfigPath(cohortId), config, config.version);
+  return saved;
+}
+
 // ─── 헬퍼 ──────────────────────────────────────────────────
 
 /** 평가 방식별 기본 입력 필드 자동 생성 */
@@ -96,7 +139,7 @@ function generateDefaultInputFields(scoringMethod, maxScore) {
   }
 }
 
-function findCategoryRecursive(categories, id) {
+export function findCategoryRecursive(categories, id) {
   for (const cat of categories) {
     if (cat.id === id) return cat;
     if (cat.sub_categories) {

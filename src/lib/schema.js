@@ -31,6 +31,34 @@ export const METHOD_LABELS = {
   [SCORING_METHOD.COMPOSITE]: '복합',
 };
 
+/** v1 스코어링 메서드 (새 카테고리 생성 시 선택 가능) */
+export const V1_SCORING_METHOD = {
+  AVERAGE: 'weighted_average',
+  SUM: 'sum_divide',
+  USER_INPUT: 'user_input',
+};
+
+/** v1 메서드 한글 라벨 (per D-03, D-10) */
+export const V1_METHOD_LABELS = {
+  [V1_SCORING_METHOD.AVERAGE]: '평균',
+  [V1_SCORING_METHOD.SUM]: '합산',
+  [V1_SCORING_METHOD.USER_INPUT]: '사용자입력',
+};
+
+/** deprecated 메서드 집합 (per D-13: 엔진 호환 유지, UI 선택 불가) */
+export const DEPRECATED_METHODS = new Set([
+  SCORING_METHOD.RANK_DIFFERENTIAL,
+  SCORING_METHOD.FORMULA,
+  SCORING_METHOD.BOOLEAN,
+  SCORING_METHOD.BOOLEAN_WITH_DEDUCTION,
+  SCORING_METHOD.COMPOSITE,
+]);
+
+/** deprecated 메서드 여부 확인 */
+export function isDeprecatedMethod(method) {
+  return DEPRECATED_METHODS.has(method);
+}
+
 export const INPUT_FIELD_TYPE = {
   NUMBER: 'number',
   TEXT: 'text',
