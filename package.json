@@ -15,7 +15,8 @@
     "test:unit": "npm run test:scoring && npm run test:team && npm run test:tree",
     "test:e2e": "npx playwright test",
     "test:e2e:team": "npx playwright test tests/e2e/team-input.spec.js",
-    "test:e2e:nav": "npx playwright test tests/e2e/recursive-nav.spec.js"
+    "test:e2e:nav": "npx playwright test tests/e2e/recursive-nav.spec.js",
+    "test:e2e:tree": "npx playwright test tests/e2e/recursive-tree.spec.js"
   },
   "dependencies": {
     "async-mutex": "^0.5.0",
