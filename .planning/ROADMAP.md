@@ -28,7 +28,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. 부모 노드의 점수가 하위 항목의 점수를 기반으로 자동 집계되어 정확한 합계를 보여준다
   3. 하위 항목이 있는 노드에서도 직접 점수를 입력하면 집계값 대신 입력값이 사용된다 (override)
   4. 서로 다른 코호트가 완전히 다른 트리 구조를 가질 수 있고, 한쪽 변경이 다른 쪽에 영향을 주지 않는다
-**Plans**: TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Core engine: schema V1 constants, override-aware scoring, config-service addSubCategory, unit tests
+- [ ] 01-02-PLAN.md — UI layer: rank column always visible, weight row for v1 methods, unified FieldManager, method selector restriction, E2E test
 
 ### Phase 2: Tree Navigation & Manipulation UI
 **Goal**: 관리자가 Notion처럼 각 카테고리를 독립 페이지로 탐색하고, 어디서든 하위 항목을 추가/삭제하며, 설정을 자유롭게 변경할 수 있다
@@ -71,7 +75,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Recursive Tree Engine | 0/TBD | Not started | - |
+| 1. Recursive Tree Engine | 0/2 | Planning complete | - |
 | 2. Tree Navigation & Manipulation UI | 0/TBD | Not started | - |
 | 3. Scoring Method Consolidation | 0/TBD | Not started | - |
 | 4. Team Scoring | 0/TBD | Not started | - |
