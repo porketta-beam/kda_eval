@@ -1,4 +1,5 @@
 import { SCORING_METHOD, COLUMN_TYPE } from '@/lib/schema';
+import { computeCategoryRanks } from '@/lib/scoring-engine/index.js';
 
 /**
  * 카테고리의 input_fields + sub_categories를 DataTable columns으로 변환
@@ -56,13 +57,13 @@ export function buildCellData(rawScores, calcResults, students, subCategories) {
  */
 export function buildResultColumns(category, calcResults, overrides, showMaxInLabel = false) {
   const cols = [];
-  if (category.scoring_method === SCORING_METHOD.RANK_DIFFERENTIAL) {
-    cols.push({
-      id: 'rank',
-      label: '순위',
-      getValue: (sid) => calcResults[sid]?.rank ?? null,
-    });
-  }
+  // 순위 칼럼: 모든 메서드에서 표시 (per D-12)
+  const categoryRanks = computeCategoryRanks(calcResults, overrides);
+  cols.push({
+    id: 'rank',
+    label: '순위',
+    getValue: (sid) => categoryRanks[sid] ?? null,
+  });
   const label = showMaxInLabel && category.max_score != null
     ? `점수 (${category.max_score})`
     : '점수';
