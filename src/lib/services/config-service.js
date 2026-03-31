@@ -4,7 +4,6 @@ import { readJSON, getConfigPath } from '@/lib/storage/file-store';
 import { writeWithLock } from '@/lib/storage/locking';
 import { createCategory, SCORING_METHOD, V1_SCORING_METHOD } from '@/lib/schema';
 import { v4 as uuidv4 } from 'uuid';
-import { produce } from 'immer';
 
 /** 기수 설정 조회 */
 export async function getConfig(cohortId) {
