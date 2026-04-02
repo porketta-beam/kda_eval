@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to execute
-stopped_at: Completed 01-01-PLAN.md
-last_updated: "2026-03-24T07:58:57.232Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 01-02-PLAN.md
+last_updated: "2026-03-24T08:14:05.822Z"
 progress:
   total_phases: 4
   completed_phases: 0
@@ -46,6 +46,7 @@ Plan: 2 of 2
 - Trend: -
 
 | Phase 01 P01 | 5min | 3 tasks | 6 files |
+| Phase 01 P02 | 9min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -58,6 +59,9 @@ Recent decisions affecting current work:
 - immer is the only new dependency needed
 - [Phase 01]: Override applied at two points: child before parent aggregation, own after calculation
 - [Phase 01]: V1 methods: weighted_average, sum_divide, user_input (3 active, 5 deprecated)
+- [Phase 01]: Rank column uses computeCategoryRanks for all methods (not per-method rank)
+- [Phase 01]: FieldManager unified: both input fields and sub-categories always visible (D-07)
+- [Phase 01]: Sub-category management via API calls for WebSocket-driven multi-client refresh
 
 ### Pending Todos
 
@@ -70,6 +74,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-24T07:58:57.228Z
-Stopped at: Completed 01-01-PLAN.md
+Last session: 2026-03-24T08:14:05.816Z
+Stopped at: Completed 01-02-PLAN.md
 Resume file: None
